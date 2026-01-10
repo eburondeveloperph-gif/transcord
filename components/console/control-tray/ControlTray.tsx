@@ -151,7 +151,7 @@ function ControlTray() {
           title={voiceFocus ? "Neural Sensitivity Active" : "Heighten Sensitivity"}
         >
           <span className={cn('material-symbols-outlined', { 'filled': voiceFocus })}>
-            {voiceFocus ? 'track_changes' : 'filter_center_focus'}
+            {voiceFocus ? 'center_focus_strong' : 'center_focus_weak'}
           </span>
         </button>
 
