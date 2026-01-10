@@ -104,8 +104,6 @@ export class GenAILiveClient {
         errorMsg = e;
       } else if (e?.statusText) {
         errorMsg = `Network error: ${e.statusText} (${e.status})`;
-      } else if (e?.message) {
-        errorMsg = e.message;
       }
 
       console.error('GenAI Live Connection Error:', e);
@@ -115,7 +113,7 @@ export class GenAILiveClient {
         message: errorMsg,
       });
       this.emitter.emit('error', errorEvent);
-      throw e;
+      return false;
     }
   }
 

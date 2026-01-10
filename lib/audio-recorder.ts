@@ -55,24 +55,11 @@ export class AudioRecorder {
   private currentGain: number = 1.0;
   private targetGain: number = 1.0;
   private noiseFloor: number = 0.01;
-  private voiceFocus: boolean = false;
+  private sensitivityInterval: number | null = null;
 
   constructor(public sampleRate = 16000) {}
 
-  setVoiceFocus(active: boolean) {
-    this.voiceFocus = active;
-    // If disabling, immediately reset gain to neutral
-    if (!active && this.recordingWorklet) {
-      this.currentGain = 1.0;
-      this.targetGain = 1.0;
-      this.recordingWorklet.port.postMessage({ gain: 1.0 });
-    }
-  }
-
   private updateSensitivity(volume: number) {
-    // Only apply adaptive sensitivity if Voice Focus is enabled
-    if (!this.voiceFocus) return;
-
     // Volume is RMS from the VU meter
     // If volume is extremely low, it might be ambient noise
     if (volume < this.noiseFloor) {
@@ -154,10 +141,6 @@ export class AudioRecorder {
 
         this.source.connect(this.vuWorklet);
         this.recording = true;
-        
-        // Ensure initial state is correct
-        this.setVoiceFocus(this.voiceFocus);
-        
         resolve();
         this.starting = null;
       } catch (err) {

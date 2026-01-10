@@ -3,7 +3,6 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-// Fix: Added React import to resolve 'Cannot find namespace React' errors
 import React, { useEffect, useRef, useState, memo, useMemo } from 'react';
 import WelcomeScreen from '../welcome-screen/WelcomeScreen';
 import { Modality, LiveServerContent } from '@google/genai';
@@ -250,6 +249,8 @@ export default function StreamingConsole() {
         parameters: tool.parameters,
       }));
 
+    // Create the config object matching LiveConnectConfig
+    // Note: thinkingConfig is removed as it can cause 'invalid argument' on some models/endpoints
     const config: any = {
       responseModalities: [Modality.AUDIO],
       speechConfig: {
@@ -261,8 +262,9 @@ export default function StreamingConsole() {
       },
       inputAudioTranscription: {},
       outputAudioTranscription: {},
-      systemInstruction: systemPrompt,
-      tools: declarations.length > 0 ? [{ functionDeclarations: declarations }] : [],
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      // Only include tools if there are declarations
+      tools: declarations.length > 0 ? [{ functionDeclarations: declarations }] : undefined,
     };
 
     setConfig(config);
@@ -301,7 +303,7 @@ export default function StreamingConsole() {
       if (!text) return;
 
       const turns = useLogStore.getState().turns;
-      const last = turns[turns.length - 1];
+      const last = turns.at(-1);
 
       if (last?.role === 'agent' && !last.isFinal) {
         updateLastTurn({ text: last.text + text });
@@ -311,8 +313,7 @@ export default function StreamingConsole() {
     };
 
     const handleTurnComplete = () => {
-      const turns = useLogStore.getState().turns;
-      const last = turns[turns.length - 1];
+      const last = useLogStore.getState().turns.at(-1);
       if (last && last.role === 'agent') {
         // Collect current audio chunks and assign to turn
         if (currentAudioChunks.current.length > 0) {

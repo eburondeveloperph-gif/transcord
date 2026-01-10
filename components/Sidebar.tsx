@@ -10,44 +10,32 @@ import { useLiveAPIContext } from '../contexts/LiveAPIContext';
 import { useState, useMemo } from 'react';
 import ToolEditorModal from './ToolEditorModal';
 
-// Categorized Language Groups
-const LANGUAGE_GROUPS: Record<string, { id: Template, label: string }[]> = {
-  'Asian & Pacific': [
-    { id: 'taglish', label: 'Filipino Taglish' },
-    { id: 'japanese', label: 'Japanese' },
-    { id: 'korean', label: 'Korean' },
-    { id: 'mandarin', label: 'Mandarin Chinese' },
-    { id: 'cantonese', label: 'Cantonese' },
-    { id: 'vietnamese', label: 'Vietnamese' },
-    { id: 'thai', label: 'Thai' },
-    { id: 'hindi', label: 'Hindi' },
-    { id: 'bengali', label: 'Bengali' },
-  ],
-  'European': [
-    { id: 'english_uk', label: 'English (UK)' },
-    { id: 'english_au', label: 'English (Australia)' },
-    { id: 'french', label: 'French (France)' },
-    { id: 'french_belgium', label: 'French (Belgium)' },
-    { id: 'german', label: 'German' },
-    { id: 'spanish', label: 'Spanish (Latin America)' },
-    { id: 'spanish_eu', label: 'Spanish (Spain)' },
-    { id: 'italian', label: 'Italian' },
-    { id: 'portuguese', label: 'Portuguese (Brazil)' },
-    { id: 'portuguese_eu', label: 'Portuguese (Portugal)' },
-    { id: 'dutch', label: 'Dutch (Netherlands)' },
-    { id: 'dutch_flemish', label: 'Dutch (Flemish)' },
-    { id: 'russian', label: 'Russian' },
-    { id: 'polish', label: 'Polish' },
-    { id: 'swedish', label: 'Swedish' },
-    { id: 'norwegian', label: 'Norwegian' },
-    { id: 'danish', label: 'Danish' },
-  ],
-  'African & Middle Eastern': [
-    { id: 'french_ivory_coast', label: 'French (Ivory Coast)' },
-    { id: 'medumba', label: 'Cameroon Medumba' },
-    { id: 'arabic', label: 'Arabic' },
-    { id: 'turkish', label: 'Turkish' },
-  ]
+const LANGUAGE_LABELS: Record<Template, string> = {
+  'taglish': 'Filipino Taglish',
+  'spanish': 'Spanish',
+  'french': 'French',
+  'french_ivory_coast': 'Ivorian French',
+  'french_belgium': 'French Belgium',
+  'medumba': 'Cameroon Medumba',
+  'dutch_flemish': 'Dutch Flemish',
+  'japanese': 'Japanese',
+  'korean': 'Korean',
+  'mandarin': 'Mandarin',
+  'german': 'German',
+  'italian': 'Italian',
+  'portuguese': 'Portuguese',
+  'russian': 'Russian',
+  'hindi': 'Hindi',
+  'arabic': 'Arabic',
+  'turkish': 'Turkish',
+  'vietnamese': 'Vietnamese',
+  'polish': 'Polish',
+  'thai': 'Thai',
+  'bengali': 'Bengali',
+  'dutch': 'Dutch (Netherlands)',
+  'swedish': 'Swedish',
+  'norwegian': 'Norwegian',
+  'danish': 'Danish'
 };
 
 /**
@@ -132,23 +120,17 @@ export default function Sidebar() {
               
               <label className="sidebar-label">
                 Target Language
-                <div className="select-wrapper">
-                  <select 
-                    value={template} 
-                    onChange={e => setTemplate(e.target.value as Template)} 
-                    className="sidebar-select"
-                  >
-                    {Object.entries(LANGUAGE_GROUPS).map(([group, languages]) => (
-                      <optgroup label={group} key={group}>
-                        {languages.map(lang => (
-                          <option key={lang.id} value={lang.id}>
-                            {lang.label}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </div>
+                <select 
+                  value={template} 
+                  onChange={e => setTemplate(e.target.value as Template)} 
+                  className="sidebar-select"
+                >
+                  {(Object.keys(LANGUAGE_LABELS) as Template[]).sort((a,b) => LANGUAGE_LABELS[a].localeCompare(LANGUAGE_LABELS[b])).map(key => (
+                    <option key={key} value={key}>
+                      {LANGUAGE_LABELS[key]}
+                    </option>
+                  ))}
+                </select>
                 {voiceFocus && <div className="focus-badge">High Precision Active</div>}
               </label>
 
@@ -205,7 +187,7 @@ export default function Sidebar() {
         </div>
         
         <div className="sidebar-footer">
-          <div className="version-tag">v2.9.1-Native</div>
+          <div className="version-tag">v2.9.0-Native</div>
           <div className={c('connection-indicator', { connected })}>
             {connected ? 'ENGINE ONLINE' : 'ENGINE STANDBY'}
           </div>

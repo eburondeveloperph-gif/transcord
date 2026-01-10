@@ -32,13 +32,6 @@ function ControlTray() {
     }
   }, [connected]);
 
-  // Sync Voice Focus state with the AudioRecorder logic
-  useEffect(() => {
-    if (audioRecorder) {
-      audioRecorder.setVoiceFocus(voiceFocus);
-    }
-  }, [audioRecorder, voiceFocus]);
-
   // Turn Timer Logic - Optimized for continuous streaming
   useEffect(() => {
     let interval: number;
@@ -124,15 +117,7 @@ function ControlTray() {
     if (connected) {
       setMuted(!muted);
     } else {
-      connect().catch(console.error);
-    }
-  };
-
-  const handleMainButtonClick = () => {
-    if (connected) {
-      disconnect();
-    } else {
-      connect().catch(console.error);
+      connect();
     }
   };
 
@@ -159,16 +144,12 @@ function ControlTray() {
           title={voiceFocus ? "Neural Sensitivity Active" : "Heighten Sensitivity"}
         >
           <span className={cn('material-symbols-outlined', { 'filled': voiceFocus })}>
-            {voiceFocus ? 'center_focus_strong' : 'center_focus_weak'}
+            {voiceFocus ? 'track_changes' : 'filter_center_focus'}
           </span>
         </button>
 
         <button
-          className={cn('icon-button', { 
-            active: !muted && connected, 
-            muted: muted && connected,
-            'mic-focus': voiceFocus && !muted && connected 
-          })}
+          className={cn('icon-button', { active: !muted && connected, muted: muted && connected })}
           onClick={handleMicClick}
           aria-label={muted ? 'Unmute' : 'Mute'}
         >
@@ -180,7 +161,7 @@ function ControlTray() {
         <button
           ref={connectButtonRef}
           className={cn('icon-button main-action', { connected })}
-          onClick={handleMainButtonClick}
+          onClick={connected ? disconnect : connect}
           aria-label={connected ? 'Disconnect' : 'Connect'}
         >
           <span className="material-symbols-outlined filled">

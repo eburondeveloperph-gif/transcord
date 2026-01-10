@@ -22,8 +22,8 @@
 const AudioRecordingWorklet = `
 class AudioProcessingWorklet extends AudioWorkletProcessor {
 
-  // Reduced buffer to 256 samples (~16ms at 16khz) for ultra-low latency.
-  buffer = new Int16Array(256);
+  // Reduced buffer to 512 samples (~32ms at 16khz) for faster upstreaming.
+  buffer = new Int16Array(512);
 
   // current write index
   bufferWriteIndex = 0;
