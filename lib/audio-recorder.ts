@@ -55,38 +55,56 @@ export class AudioRecorder {
   private currentGain: number = 1.0;
   private targetGain: number = 1.0;
   private noiseFloor: number = 0.01;
-  private sensitivityInterval: number | null = null;
+  private volumeMultiplier: number = 1.0; // External control for ducking (1.0 = normal, 0.15 = ducked)
 
   constructor(public sampleRate = 16000) {}
 
+  public setVolumeMultiplier(multiplier: number) {
+    this.volumeMultiplier = multiplier;
+    // Force immediate update if recording
+    if (this.recordingWorklet) {
+       this.recordingWorklet.port.postMessage({ gain: this.currentGain * this.volumeMultiplier });
+    }
+  }
+
   private updateSensitivity(volume: number) {
     // Volume is RMS from the VU meter
-    // If volume is extremely low, it might be ambient noise
+    // Improved Noise Floor Tracking
     if (volume < this.noiseFloor) {
-      this.noiseFloor = this.noiseFloor * 0.95 + volume * 0.05; // Slowly track noise floor
+      this.noiseFloor = this.noiseFloor * 0.95 + volume * 0.05; 
+    } else if (volume > this.noiseFloor * 2) {
+      // Slow rise for noise floor to adapt to changing environments
+      this.noiseFloor += 0.0001; 
     }
 
     // Heuristic: target a comfortable peak around 0.5-0.7 RMS for the model
     const TARGET_LEVEL = 0.4;
     const MIN_GAIN = 0.5;
     const MAX_GAIN = 4.0;
+    
+    // NOISE GATE: If signal is very close to noise floor, squash it.
+    const GATE_THRESHOLD = this.noiseFloor * 1.5;
 
-    if (volume > 0.005) { // Active signal detection
+    if (volume > GATE_THRESHOLD + 0.005) { // Active signal detection
       const adjustmentFactor = TARGET_LEVEL / (volume + 0.001);
       this.targetGain = Math.max(MIN_GAIN, Math.min(MAX_GAIN, adjustmentFactor));
     } else {
-      // Quiet room: slightly increase sensitivity if background is very low
-      if (this.noiseFloor < 0.01) {
-        this.targetGain = Math.min(MAX_GAIN, this.targetGain * 1.01);
-      }
+      // Below gate: aggressively reduce gain to suppress background static
+      // This implements the "Very Good VAD" behavior by cleaning up silence.
+      this.targetGain = 0.0;
     }
 
-    // Smoothly transition current gain to target gain
-    this.currentGain = this.currentGain * 0.9 + this.targetGain * 0.1;
+    // Smoothly transition current gain to target gain (Attack/Release)
+    // Faster attack for speech, slower release for silence
+    const alpha = this.targetGain > this.currentGain ? 0.2 : 0.05;
+    this.currentGain = this.currentGain * (1 - alpha) + this.targetGain * alpha;
     
+    // Apply external ducking multiplier (e.g. 0.15 when AI is speaking)
+    const finalGain = this.currentGain * this.volumeMultiplier;
+
     // Send updated gain to worklet
     if (this.recordingWorklet) {
-      this.recordingWorklet.port.postMessage({ gain: this.currentGain });
+      this.recordingWorklet.port.postMessage({ gain: finalGain });
     }
   }
 
@@ -159,6 +177,7 @@ export class AudioRecorder {
       this.recording = false;
       this.currentGain = 1.0;
       this.targetGain = 1.0;
+      this.volumeMultiplier = 1.0;
     };
     if (this.starting) {
       this.starting.then(handleStop).catch(handleStop);

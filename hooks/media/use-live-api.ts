@@ -36,7 +36,7 @@ export type UseLiveApiResults = {
   connect: () => Promise<void>;
   disconnect: () => void;
   connected: boolean;
-
+  isAiSpeaking: boolean;
   volume: number;
 };
 
@@ -65,14 +65,21 @@ export function useLiveApi({
 
   const [volume, setVolume] = useState(0);
   const [connected, setConnected] = useState(false);
+  const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [config, setConfig] = useState<LiveConnectConfig>({});
 
   // register audio for streaming server -> speakers
   useEffect(() => {
     if (!audioStreamerRef.current) {
       audioContext({ id: 'audio-out' }).then((audioCtx: AudioContext) => {
-        audioStreamerRef.current = new AudioStreamer(audioCtx);
-        audioStreamerRef.current
+        const streamer = new AudioStreamer(audioCtx);
+        audioStreamerRef.current = streamer;
+        
+        // Setup state listeners for AI speaking status
+        streamer.onPlay = () => setIsAiSpeaking(true);
+        streamer.onStop = () => setIsAiSpeaking(false);
+
+        streamer
           .addWorklet<any>('vumeter-out', VolMeterWorket, (ev: any) => {
             setVolume(ev.data.volume);
           })
@@ -218,6 +225,7 @@ export function useLiveApi({
     connect,
     connected,
     disconnect,
+    isAiSpeaking,
     volume,
   };
 }

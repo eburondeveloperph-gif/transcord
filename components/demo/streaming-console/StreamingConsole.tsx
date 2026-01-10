@@ -204,7 +204,7 @@ export default function StreamingConsole() {
         handleSendMessage(text.trim());
         useLogStore.getState().addTurn({
           role: 'system',
-          text: `📥 Stream Input (Database): "${text}"`,
+          text: `📥 Stream Input: "${text}"`,
           isFinal: true
         });
       }
@@ -227,8 +227,6 @@ export default function StreamingConsole() {
         parameters: tool.parameters,
       }));
 
-    // Construct the config strictly according to the LiveConnectConfig interface
-    // to avoid sending undefined keys or invalid structures.
     const config: LiveConnectConfig = {
       responseModalities: [Modality.AUDIO],
       speechConfig: {
@@ -243,7 +241,6 @@ export default function StreamingConsole() {
       systemInstruction: { parts: [{ text: systemPrompt }] },
     };
 
-    // Only add tools if there are valid declarations
     if (declarations.length > 0) {
       config.tools = [{ functionDeclarations: declarations }];
     }
@@ -296,7 +293,6 @@ export default function StreamingConsole() {
     const handleTurnComplete = () => {
       const last = useLogStore.getState().turns.at(-1);
       if (last && last.role === 'agent') {
-        // Collect current audio chunks and assign to turn
         if (currentAudioChunks.current.length > 0) {
           const totalLength = currentAudioChunks.current.reduce((acc, curr) => acc + curr.length, 0);
           const audioData = new Uint8Array(totalLength);
@@ -356,7 +352,7 @@ export default function StreamingConsole() {
             >
               <div className="transcription-header">
                 <div className="transcription-source">
-                  {t.role === 'user' ? 'Speaker' : t.role === 'agent' ? 'Oracle' : 'Stream'}
+                  {t.role === 'user' ? 'You' : t.role === 'agent' ? 'Translator' : 'System'}
                 </div>
                 <div className="transcription-timestamp">
                   {formatTimestamp(t.timestamp)}
@@ -374,25 +370,24 @@ export default function StreamingConsole() {
         </div>
       )}
       
-      {turns.length > 0 && (
-        <div className="chat-composer-inline">
-          <input
-            type="text"
-            className="chat-composer-input"
-            placeholder="Type your message..."
-            value={chatValue}
-            onChange={(e) => setChatValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-          <button 
-            className="chat-composer-submit" 
-            onClick={() => handleSendMessage()}
-            disabled={!chatValue.trim()}
-          >
-            <span className="material-symbols-outlined">send</span>
-          </button>
-        </div>
-      )}
+      {/* Hidden but accessible chat input for fallback/testing */}
+      <div className="chat-composer-inline">
+        <input
+          type="text"
+          className="chat-composer-input"
+          placeholder="Type a message..."
+          value={chatValue}
+          onChange={(e) => setChatValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+        <button 
+          className="chat-composer-submit" 
+          onClick={() => handleSendMessage()}
+          disabled={!chatValue.trim()}
+        >
+          <span className="material-symbols-outlined">send</span>
+        </button>
+      </div>
     </div>
   );
 }

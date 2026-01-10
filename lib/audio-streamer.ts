@@ -25,6 +25,8 @@ export class AudioStreamer {
   private endOfQueueAudioSource: AudioBufferSourceNode | null = null;
 
   public onComplete = () => {};
+  public onPlay = () => {};
+  public onStop = () => {};
 
   constructor(public context: AudioContext) {
     this.gainNode = this.context.createGain();
@@ -82,6 +84,7 @@ export class AudioStreamer {
     }
     if (!this.isPlaying) {
       this.isPlaying = true;
+      this.onPlay();
       this.scheduledTime = this.context.currentTime + this.initialBufferTime;
       this.scheduleNextBuffer();
     }
@@ -114,6 +117,10 @@ export class AudioStreamer {
           if (!this.audioQueue.length && this.endOfQueueAudioSource === source) {
             this.endOfQueueAudioSource = null;
             this.onComplete();
+            if (this.isPlaying) {
+              this.isPlaying = false;
+              this.onStop();
+            }
           }
         };
       }
@@ -128,6 +135,7 @@ export class AudioStreamer {
     if (this.audioQueue.length === 0) {
       if (this.isStreamComplete) {
         this.isPlaying = false;
+        this.onStop();
         if (this.checkInterval) {
           clearInterval(this.checkInterval);
           this.checkInterval = null;
@@ -145,6 +153,7 @@ export class AudioStreamer {
 
   stop() {
     this.isPlaying = false;
+    this.onStop();
     this.isStreamComplete = true;
     this.audioQueue = [];
     this.scheduledTime = this.context.currentTime;

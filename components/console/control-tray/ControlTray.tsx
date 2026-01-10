@@ -6,7 +6,7 @@
 import cn from 'classnames';
 import React, { memo, useEffect, useRef, useState } from 'react';
 import { AudioRecorder } from '../../../lib/audio-recorder';
-import { useUI } from '../../../lib/state';
+import { useUI, useSettings } from '../../../lib/state';
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
 
 function ControlTray() {
@@ -14,14 +14,23 @@ function ControlTray() {
   const [muted, setMuted] = useState(false);
   const connectButtonRef = useRef<HTMLButtonElement>(null);
 
-  const { client, connected, connect, disconnect } = useLiveAPIContext();
+  const { client, connected, connect, disconnect, isAiSpeaking } = useLiveAPIContext();
   const { toggleSidebar, isSidebarOpen } = useUI();
+  const { voiceFocus, setVoiceFocus } = useSettings();
 
   useEffect(() => {
     if (!connected) {
       setMuted(false);
     }
   }, [connected]);
+
+  // Handle Ducking: reduce mic input level to 15% when AI is speaking
+  useEffect(() => {
+    if (audioRecorder) {
+      // If AI is speaking, duck to 15%, otherwise full 100%
+      audioRecorder.setVolumeMultiplier(isAiSpeaking ? 0.15 : 1.0);
+    }
+  }, [isAiSpeaking, audioRecorder]);
 
   useEffect(() => {
     const onData = (base64: string) => {
@@ -54,6 +63,8 @@ function ControlTray() {
   return (
     <section className="control-tray-floating">
       <div className={cn('floating-pill', { 'focus-active': connected })}>
+        
+        {/* 1. Settings */}
         <button
           className={cn('icon-button', { active: isSidebarOpen })}
           onClick={toggleSidebar}
@@ -62,6 +73,19 @@ function ControlTray() {
           <span className="material-symbols-outlined">settings</span>
         </button>
 
+        {/* 2. Voice Focus (Restored) */}
+        <button
+          className={cn('icon-button', { active: voiceFocus })}
+          onClick={() => setVoiceFocus(!voiceFocus)}
+          aria-label={voiceFocus ? "Disable Voice Focus" : "Enable Voice Focus"}
+          title="Neural Sensitivity (Voice Focus)"
+        >
+          <span className="material-symbols-outlined">
+            {voiceFocus ? 'center_focus_strong' : 'center_focus_weak'}
+          </span>
+        </button>
+
+        {/* 3. Mic Toggle */}
         <button
           className={cn('icon-button', { active: !muted && connected, muted: muted && connected })}
           onClick={handleMicClick}
@@ -72,6 +96,7 @@ function ControlTray() {
           </span>
         </button>
 
+        {/* 4. Connection Manager */}
         <button
           ref={connectButtonRef}
           className={cn('icon-button main-action', { connected })}
