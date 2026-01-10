@@ -38,9 +38,7 @@ export interface LiveClientEventTypes {
   open: () => void;
   setupcomplete: () => void;
   toolcall: (toolCall: LiveServerToolCall) => void;
-  toolcallcancellation: (
-    toolcallCancellation: LiveServerToolCallCancellation
-  ) => void;
+  toolcallcancellation: (toolcallCancellation: LiveServerToolCallCancellation) => void;
   turncomplete: () => void;
   inputTranscription: (text: string, isFinal: boolean) => void;
   outputTranscription: (text: string, isFinal: boolean) => void;
@@ -53,71 +51,48 @@ export class GenAILiveClient {
   public off = this.emitter.off.bind(this.emitter);
 
   public readonly model: string = DEFAULT_LIVE_API_MODEL;
-
   protected readonly client: GoogleGenAI;
   protected session?: Session;
 
   private _status: 'connected' | 'disconnected' | 'connecting' = 'disconnected';
-  public get status() {
-    return this._status;
-  }
+  public get status() { return this._status; }
 
   constructor(apiKey: string, model?: string) {
     if (model) this.model = model;
-
-    this.client = new GoogleGenAI({
-      apiKey: apiKey,
-    });
+    this.client = new GoogleGenAI({ apiKey });
   }
 
   public async connect(config: LiveConnectConfig): Promise<boolean> {
-    if (this._status === 'connected' || this._status === 'connecting') {
-      return true;
-    }
+    if (this._status === 'connected' || this._status === 'connecting') return true;
 
     this._status = 'connecting';
     const callbacks: LiveCallbacks = {
-      onopen: this.onOpen.bind(this),
+      onopen: () => {
+        this._status = 'connected';
+        this.emitter.emit('open');
+      },
       onmessage: this.onMessage.bind(this),
-      onerror: this.onError.bind(this),
-      onclose: this.onClose.bind(this),
+      onerror: (e: any) => {
+        this._status = 'disconnected';
+        this.emitter.emit('error', new ErrorEvent('error', { error: e, message: e?.message || 'WebSocket Error' }));
+      },
+      onclose: (e: CloseEvent) => {
+        this._status = 'disconnected';
+        this.emitter.emit('close', e);
+      },
     };
 
     try {
       this.session = await this.client.live.connect({
         model: this.model,
-        config: {
-          ...config,
-        },
+        config,
         callbacks,
       });
-      // Explicitly set connected status if session is created, 
-      // addressing race condition where onOpen hasn't fired yet.
-      if (this._status === 'connecting') {
-        this._status = 'connected';
-      }
       return true;
     } catch (e: any) {
       this._status = 'disconnected';
-      this.session = undefined;
-      
-      // Extract a meaningful error message
-      let errorMsg = 'Network error: Connection failed';
-      if (e instanceof Error) {
-        errorMsg = e.message;
-      } else if (typeof e === 'string') {
-        errorMsg = e;
-      } else if (e?.statusText) {
-        errorMsg = `Network error: ${e.statusText} (${e.status})`;
-      }
-
-      console.error('GenAI Live Connection Error:', e);
-      
-      const errorEvent = new ErrorEvent('error', {
-        error: e,
-        message: errorMsg,
-      });
-      this.emitter.emit('error', errorEvent);
+      const msg = e?.message || 'Network error: Connection failed';
+      this.emitter.emit('error', new ErrorEvent('error', { error: e, message: msg }));
       return false;
     }
   }
@@ -128,46 +103,25 @@ export class GenAILiveClient {
       this.session = undefined;
     }
     this._status = 'disconnected';
-    this.log('client.close', `Disconnected`);
     return true;
   }
 
   public send(parts: Part | Part[], turnComplete: boolean = true) {
-    if (this._status !== 'connected' || !this.session) {
-      this.emitter.emit('error', new ErrorEvent('error', { message: 'Client not connected' }));
-      return;
-    }
-    // Correct structure for sendClientContent is { turns: Content[], turnComplete: boolean }
-    // where Content is { parts: Part[] }
+    if (this._status !== 'connected' || !this.session) return;
     const partsArray = Array.isArray(parts) ? parts : [parts];
-    this.session.sendClientContent({ 
-      turns: [{ parts: partsArray }], 
-      turnComplete 
-    });
-    this.log(`client.send`, parts);
+    this.session.sendClientContent({ turns: [{ parts: partsArray }], turnComplete });
   }
 
   public sendRealtimeInput(chunks: Array<{ mimeType: string; data: string }>) {
     if (this._status !== 'connected' || !this.session) return;
-    
-    chunks.forEach(chunk => {
-      if (this.session) {
-        this.session.sendRealtimeInput({ media: chunk });
-      }
-    });
-
-    let message = 'media-input';
-    this.log(`client.realtimeInput`, message);
+    chunks.forEach(chunk => this.session?.sendRealtimeInput({ media: chunk }));
   }
 
   public sendToolResponse(toolResponse: LiveClientToolResponse) {
     if (this._status !== 'connected' || !this.session) return;
     if (toolResponse.functionResponses?.length) {
-      this.session.sendToolResponse({
-        functionResponses: toolResponse.functionResponses!,
-      });
+      this.session.sendToolResponse({ functionResponses: toolResponse.functionResponses });
     }
-    this.log(`client.toolResponse`, { toolResponse });
   }
 
   protected onMessage(message: LiveServerMessage) {
@@ -179,34 +133,15 @@ export class GenAILiveClient {
       this.emitter.emit('toolcall', message.toolCall);
       return;
     }
-    if (message.toolCallCancellation) {
-      this.emitter.emit('toolcallcancellation', message.toolCallCancellation);
-      return;
-    }
-
     if (message.serverContent) {
       const { serverContent } = message;
-      if (serverContent.interrupted) {
-        this.emitter.emit('interrupted');
-        return;
-      }
-
+      if (serverContent.interrupted) this.emitter.emit('interrupted');
       if (serverContent.inputTranscription) {
-        this.emitter.emit(
-          'inputTranscription',
-          serverContent.inputTranscription.text,
-          (serverContent.inputTranscription as any).isFinal ?? false,
-        );
+        this.emitter.emit('inputTranscription', serverContent.inputTranscription.text, (serverContent.inputTranscription as any).isFinal ?? false);
       }
-
       if (serverContent.outputTranscription) {
-        this.emitter.emit(
-          'outputTranscription',
-          serverContent.outputTranscription.text,
-          (serverContent.outputTranscription as any).isFinal ?? false,
-        );
+        this.emitter.emit('outputTranscription', serverContent.outputTranscription.text, (serverContent.outputTranscription as any).isFinal ?? false);
       }
-
       if (serverContent.modelTurn) {
         let parts: Part[] = serverContent.modelTurn.parts || [];
         const audioParts = parts.filter(p => p.inlineData?.mimeType?.startsWith('audio/pcm'));
@@ -214,39 +149,13 @@ export class GenAILiveClient {
         const otherParts = difference(parts, audioParts);
 
         base64s.forEach(b64 => {
-          if (b64) {
-            const data = base64ToArrayBuffer(b64);
-            this.emitter.emit('audio', data);
-          }
+          if (b64) this.emitter.emit('audio', base64ToArrayBuffer(b64));
         });
-
         if (otherParts.length > 0) {
           this.emitter.emit('content', { modelTurn: { parts: otherParts } });
         }
       }
-
-      if (serverContent.turnComplete) {
-        this.emitter.emit('turncomplete');
-      }
+      if (serverContent.turnComplete) this.emitter.emit('turncomplete');
     }
-  }
-
-  protected onError(e: ErrorEvent) {
-    this._status = 'disconnected';
-    this.emitter.emit('error', e);
-  }
-
-  protected onOpen() {
-    this._status = 'connected';
-    this.emitter.emit('open');
-  }
-
-  protected onClose(e: CloseEvent) {
-    this._status = 'disconnected';
-    this.emitter.emit('close', e);
-  }
-
-  protected log(type: string, message: string | object) {
-    this.emitter.emit('log', { type, message, date: new Date() });
   }
 }
