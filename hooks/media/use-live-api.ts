@@ -46,8 +46,18 @@ export function useLiveApi({
   apiKey: string;
 }): UseLiveApiResults {
   const { model } = useSettings();
-  // Initialize client only once per API key change
-  const client = useMemo(() => new GenAILiveClient(apiKey, model), [apiKey, model]);
+  
+  // Initialize client and handle cleanup
+  const client = useMemo(() => {
+    const newClient = new GenAILiveClient(apiKey, model);
+    return newClient;
+  }, [apiKey, model]);
+
+  useEffect(() => {
+    return () => {
+      client.disconnect();
+    };
+  }, [client]);
 
   const audioStreamerRef = useRef<AudioStreamer | null>(null);
   const isConnectingRef = useRef(false);
@@ -161,8 +171,9 @@ export function useLiveApi({
     if (connected || isConnectingRef.current) {
       return;
     }
-    if (!config) {
-      throw new Error('config has not been set');
+    if (!config || Object.keys(config).length === 0) {
+      console.warn('Config is empty, delaying connect');
+      return;
     }
     isConnectingRef.current = true;
     try {

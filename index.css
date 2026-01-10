@@ -145,63 +145,80 @@ html, body {
 .user .transcription-source { color: var(--text-muted); }
 
 /* Playback Controls */
+.playback-controls-wrapper {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .playback-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 12px;
+  width: 100%;
 }
 
-.playback-controls button {
-  background: rgba(255, 255, 255, 0.1);
+.playback-btn {
+  background: rgba(255, 255, 255, 0.08);
   border: none;
   color: var(--text);
-  width: 36px; /* Slightly larger for touch */
+  width: 36px;
   height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
 }
 
-@media (max-width: 480px) {
-  .playback-controls button {
-    width: 32px;
-    height: 32px;
-  }
+.playback-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.05);
 }
 
-.playback-controls button:hover {
-  background: rgba(255, 255, 255, 0.2);
+.playback-btn:active:not(:disabled) {
+  transform: scale(0.95);
 }
 
-.playback-controls button:disabled {
-  opacity: 0.3;
+.playback-btn:disabled {
+  opacity: 0.2;
   cursor: default;
 }
 
-.playback-controls button .material-symbols-outlined {
-  font-size: 18px;
+.playback-btn .material-symbols-outlined {
+  font-size: 20px;
 }
 
-.playing-indicator {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--success);
-  box-shadow: 0 0 8px var(--success);
-  margin-left: 4px;
-  animation: playingPulse 1s infinite;
+.playback-progress-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-@keyframes playingPulse {
-  0% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.5); opacity: 0.5; }
-  100% { transform: scale(1); opacity: 1; }
+.playback-progress-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+.playback-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+  transition: width 0.05s linear;
+}
+
+.playback-duration {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: 'Space Mono', monospace;
+  text-align: right;
 }
 
 /* Chat Composer Inline */

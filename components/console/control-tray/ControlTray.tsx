@@ -21,6 +21,7 @@ function ControlTray() {
   const [turnElapsed, setTurnElapsed] = useState(0);
   const connectButtonRef = useRef<HTMLButtonElement>(null);
   const beepedRef = useRef<Set<number>>(new Set());
+  const startTimeRef = useRef<number>(0);
 
   const { client, connected, connect, disconnect } = useLiveAPIContext();
   const { toggleSidebar } = useUI();
@@ -36,56 +37,70 @@ function ControlTray() {
       setMuted(false);
       setTurnElapsed(0);
       beepedRef.current.clear();
+      startTimeRef.current = 0;
     }
   }, [connected]);
 
-  // Turn Timer Logic
+  // Turn Timer Logic - Optimized for continuous streaming
   useEffect(() => {
     let interval: number;
     const isRecording = connected && !muted;
 
     if (isRecording) {
-      const startTime = Date.now();
+      if (startTimeRef.current === 0) {
+        startTimeRef.current = Date.now();
+      }
+
       interval = window.setInterval(() => {
-        const elapsed = (Date.now() - startTime) / 1000;
+        const elapsed = (Date.now() - startTimeRef.current) / 1000;
         setTurnElapsed(elapsed);
 
-        // Audible countdown at 27, 28, 29 seconds
+        // Audible countdown at 27, 28, 29 seconds for rhythmic sync
         const floorElapsed = Math.floor(elapsed);
         if ([27, 28, 29].includes(floorElapsed) && !beepedRef.current.has(floorElapsed)) {
-          playBeep(floorElapsed === 29 ? 1320 : 880); // Higher pitch for the last bip
+          playBeep(floorElapsed === 29 ? 1320 : 880); // Higher pitch for the final sync bip
           beepedRef.current.add(floorElapsed);
         }
 
-        // Auto-Finalize at 30 seconds
+        // Forced finalization at 30 seconds without stopping the mic
         if (elapsed >= MAX_TURN_SECONDS) {
-          setMuted(true);
-          playBeep(440, 0.3); // Low bip to signify forced stop
-          clearInterval(interval);
+          // Force the model to finalize its current interpretation block
+          client.send([], true);
+          
+          // Play a unique high-frequency "reset" beep
+          playBeep(1760, 0.05); 
+          
+          // Reset local timer tracking for the next continuous segment
+          startTimeRef.current = Date.now();
+          setTurnElapsed(0);
+          beepedRef.current.clear();
         }
       }, 100);
     } else {
       setTurnElapsed(0);
       beepedRef.current.clear();
+      startTimeRef.current = 0;
     }
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [connected, muted]);
+  }, [connected, muted, client]);
 
   // Reset timer on model response completion
   useEffect(() => {
     const onTurnComplete = () => {
-      // If we were muted because of the timer, we might want to stay muted 
-      // or auto-unmute. For now, we just reset the local tracking.
-      beepedRef.current.clear();
+      // In continuous mode, the timer is primarily managed by the interval
+      // but we can clear beeps if the model responds early.
+      if (turnElapsed < 25) {
+        beepedRef.current.clear();
+      }
     };
     client.on('turncomplete', onTurnComplete);
     return () => {
       client.off('turncomplete', onTurnComplete);
     };
-  }, [client]);
+  }, [client, turnElapsed]);
 
   useEffect(() => {
     const onData = (base64: string) => {
@@ -135,12 +150,12 @@ function ControlTray() {
     <section className="control-tray-floating">
       <div className={cn('floating-pill', { 'focus-active': voiceFocus && connected })}>
         
-        {/* Turn Timer Progress Bar (Hidden when not recording) */}
+        {/* Continuous Progress Indicator */}
         {connected && !muted && (
           <div className="turn-timer-bar">
             <div 
               className="turn-timer-progress" 
-              style={{ width: `${progressPercent}%`, backgroundColor: progressPercent > 80 ? 'var(--danger)' : 'var(--accent)' }}
+              style={{ width: `${progressPercent}%`, backgroundColor: progressPercent > 90 ? 'var(--success)' : 'var(--accent)' }}
             />
           </div>
         )}

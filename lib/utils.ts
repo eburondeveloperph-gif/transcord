@@ -38,7 +38,9 @@ export const audioContext: (
       const a = new Audio();
       a.src =
         'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-      await a.play();
+      // Silence potential auto-play policy errors
+      await a.play().catch(() => {});
+      
       if (options?.id && map.has(options.id)) {
         const ctx = map.get(options.id);
         if (ctx) {
@@ -80,19 +82,24 @@ export function base64ToArrayBuffer(base64: string) {
  * Plays a short beep sound.
  */
 export async function playBeep(frequency = 880, duration = 0.1) {
-  const ctx = await audioContext({ id: 'ui-sounds' });
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
+  try {
+    const ctx = await audioContext({ id: 'ui-sounds' });
+    if (ctx.state === 'suspended') await ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
 
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(frequency, ctx.currentTime);
-  
-  gain.gain.setValueAtTime(0.1, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(frequency, ctx.currentTime);
+    
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
 
-  osc.connect(gain);
-  gain.connect(ctx.destination);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
 
-  osc.start();
-  osc.stop(ctx.currentTime + duration);
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+  } catch (e) {
+    console.debug('Beep failed (likely auto-play restriction)');
+  }
 }

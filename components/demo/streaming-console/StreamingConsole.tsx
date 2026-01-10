@@ -3,13 +3,14 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useEffect, useRef, useState, memo } from 'react';
+import { useEffect, useRef, useState, memo, useMemo } from 'react';
 import PopUp from '../popup/PopUp';
 import WelcomeScreen from '../welcome-screen/WelcomeScreen';
 import { Modality, LiveServerContent } from '@google/genai';
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
 import { AudioRecorder } from '../../../lib/audio-recorder';
 import { wsService } from '../../../lib/websocket-service';
+import { audioContext } from '../../../lib/utils';
 import {
   useSettings,
   useLogStore,
@@ -21,6 +22,12 @@ const formatTimestamp = (date: Date) => {
   const hours = pad(date.getHours());
   const minutes = pad(date.getMinutes());
   return `${hours}:${minutes}`;
+};
+
+const formatDuration = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
 const renderContent = (text: string) => {
@@ -35,41 +42,44 @@ const renderContent = (text: string) => {
 
 /**
  * Component for message playback controls (Play, Pause, Stop).
+ * Enhanced with progress tracking and duration display.
  */
 const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
   const [status, setStatus] = useState<'playing' | 'paused' | 'stopped'>('stopped');
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const [progress, setProgress] = useState(0);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const startTimeRef = useRef(0);
   const pausedAtRef = useRef(0);
   const bufferRef = useRef<AudioBuffer | null>(null);
+  const progressIntervalRef = useRef<number | null>(null);
 
-  const initAudio = async () => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+  // PCM16: 2 bytes per sample, 24000 samples per second
+  const duration = useMemo(() => audioData.length / 2 / 24000, [audioData]);
+
+  const initBuffer = async () => {
+    if (bufferRef.current) return bufferRef.current;
+    const ctx = await audioContext({ id: 'playback' });
+    const dataInt16 = new Int16Array(audioData.buffer);
+    const float32 = new Float32Array(dataInt16.length);
+    for (let i = 0; i < dataInt16.length; i++) {
+      float32[i] = dataInt16[i] / 32768;
     }
-    if (!bufferRef.current) {
-      const ctx = audioContextRef.current;
-      const dataInt16 = new Int16Array(audioData.buffer);
-      const float32 = new Float32Array(dataInt16.length);
-      for (let i = 0; i < dataInt16.length; i++) {
-        float32[i] = dataInt16[i] / 32768;
-      }
-      const buffer = ctx.createBuffer(1, float32.length, 24000);
-      buffer.getChannelData(0).set(float32);
-      bufferRef.current = buffer;
-    }
+    const buffer = ctx.createBuffer(1, float32.length, 24000);
+    buffer.getChannelData(0).set(float32);
+    bufferRef.current = buffer;
+    return buffer;
   };
 
   const handlePlay = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    await initAudio();
-    const ctx = audioContextRef.current!;
+    const ctx = await audioContext({ id: 'playback' });
+    if (ctx.state === 'suspended') await ctx.resume();
+    const buffer = await initBuffer();
 
     if (status === 'playing') return;
 
     const source = ctx.createBufferSource();
-    source.buffer = bufferRef.current;
+    source.buffer = buffer;
     source.connect(ctx.destination);
     
     const offset = status === 'paused' ? pausedAtRef.current : 0;
@@ -77,24 +87,33 @@ const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
     startTimeRef.current = ctx.currentTime - offset;
     sourceRef.current = source;
     
+    setStatus('playing');
+
+    progressIntervalRef.current = window.setInterval(() => {
+      const current = ctx.currentTime - startTimeRef.current;
+      const percent = Math.min(100, (current / duration) * 100);
+      setProgress(percent);
+    }, 50);
+
     source.onended = () => {
-      // Check if ended naturally or stopped/paused
       if (sourceRef.current === source) {
         setStatus('stopped');
         pausedAtRef.current = 0;
+        setProgress(0);
+        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
       }
     };
-
-    setStatus('playing');
   };
 
   const handlePause = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (sourceRef.current && status === 'playing') {
+      const ctx = (sourceRef.current.context as AudioContext);
       sourceRef.current.stop();
-      pausedAtRef.current = audioContextRef.current!.currentTime - startTimeRef.current;
+      pausedAtRef.current = ctx.currentTime - startTimeRef.current;
       sourceRef.current = null;
       setStatus('paused');
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     }
   };
 
@@ -105,32 +124,45 @@ const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
       sourceRef.current = null;
     }
     pausedAtRef.current = 0;
+    setProgress(0);
     setStatus('stopped');
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
   };
 
   useEffect(() => {
     return () => {
-      if (sourceRef.current) {
-        sourceRef.current.stop();
-      }
+      if (sourceRef.current) sourceRef.current.stop();
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     };
   }, []);
 
   return (
-    <div className="playback-controls">
-      {status !== 'playing' ? (
-        <button onClick={handlePlay} title="Play interpretation">
-          <span className="material-symbols-outlined">play_arrow</span>
+    <div className="playback-controls-wrapper">
+      <div className="playback-controls">
+        {status !== 'playing' ? (
+          <button className="playback-btn" onClick={handlePlay} title="Play interpretation">
+            <span className="material-symbols-outlined">play_arrow</span>
+          </button>
+        ) : (
+          <button className="playback-btn" onClick={handlePause} title="Pause interpretation">
+            <span className="material-symbols-outlined">pause</span>
+          </button>
+        )}
+        <button className="playback-btn" onClick={handleStop} disabled={status === 'stopped'} title="Stop">
+          <span className="material-symbols-outlined">stop</span>
         </button>
-      ) : (
-        <button onClick={handlePause} title="Pause interpretation">
-          <span className="material-symbols-outlined">pause</span>
-        </button>
-      )}
-      <button onClick={handleStop} disabled={status === 'stopped'} title="Stop">
-        <span className="material-symbols-outlined">stop</span>
-      </button>
-      {status === 'playing' && <div className="playing-indicator" />}
+        
+        <div className="playback-progress-container">
+          <div className="playback-progress-track">
+            <div className="playback-progress-fill" style={{ width: `${progress}%` }} />
+          </div>
+          <div className="playback-duration">
+            {status === 'playing' || status === 'paused' 
+              ? formatDuration(pausedAtRef.current || (progress / 100 * duration))
+              : formatDuration(duration)}
+          </div>
+        </div>
+      </div>
     </div>
   );
 });

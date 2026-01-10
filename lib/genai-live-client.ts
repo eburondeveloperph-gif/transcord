@@ -72,7 +72,7 @@ export class GenAILiveClient {
 
   public async connect(config: LiveConnectConfig): Promise<boolean> {
     if (this._status === 'connected' || this._status === 'connecting') {
-      return false;
+      return true;
     }
 
     this._status = 'connecting';
@@ -95,7 +95,17 @@ export class GenAILiveClient {
     } catch (e: any) {
       this._status = 'disconnected';
       this.session = undefined;
-      const errorMsg = e?.message || 'Network error or connection failed';
+      
+      // Extract a meaningful error message
+      let errorMsg = 'Network error: Connection failed';
+      if (e instanceof Error) {
+        errorMsg = e.message;
+      } else if (typeof e === 'string') {
+        errorMsg = e;
+      } else if (e?.statusText) {
+        errorMsg = `Network error: ${e.statusText} (${e.status})`;
+      }
+
       console.error('GenAI Live Connection Error:', e);
       
       const errorEvent = new ErrorEvent('error', {
@@ -108,8 +118,10 @@ export class GenAILiveClient {
   }
 
   public disconnect() {
-    this.session?.close();
-    this.session = undefined;
+    if (this.session) {
+      this.session.close();
+      this.session = undefined;
+    }
     this._status = 'disconnected';
     this.log('client.close', `Disconnected`);
     return true;
@@ -128,7 +140,9 @@ export class GenAILiveClient {
     if (this._status !== 'connected' || !this.session) return;
     
     chunks.forEach(chunk => {
-      this.session!.sendRealtimeInput({ media: chunk });
+      if (this.session) {
+        this.session.sendRealtimeInput({ media: chunk });
+      }
     });
 
     let message = 'media-input';

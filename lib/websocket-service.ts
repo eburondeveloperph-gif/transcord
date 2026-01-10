@@ -32,6 +32,12 @@ export class WebSocketService {
   }
 
   public connect() {
+    // Only attempt if on localhost or explicitly configured, otherwise ignore to avoid CORS/Network noise
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && this.url.includes('localhost')) {
+      console.debug('WebSocket Service: Skipping localhost connection from non-local origin.');
+      return;
+    }
+
     if (this.ws || this._status === 'connecting') return;
 
     this.setStatus('connecting');
@@ -60,21 +66,21 @@ export class WebSocketService {
       };
 
       this.ws.onerror = (error) => {
-        console.warn('WebSocket Service: Connection Error');
-        this.emitter.emit('error', new Error('WS connection error'));
+        // SILENT ERROR: Do not bubble up to global handlers to avoid "Network Error" confusion
+        console.debug('WebSocket Service: Optional local connection unavailable.');
       };
 
       this.ws.onclose = (event) => {
         this.ws = null;
         this.setStatus('disconnected');
-        if (!event.wasClean) {
-          console.log('WebSocket Service: Attempting reconnect in 5s...');
-          this.reconnectTimeout = window.setTimeout(() => this.connect(), 5000);
+        // Only retry a few times then give up to avoid constant console noise
+        if (!event.wasClean && this.url.includes('localhost')) {
+          // No auto-reconnect for local dev sockets if they fail initially
         }
       };
     } catch (err) {
       this.setStatus('disconnected');
-      console.error('WebSocket Service: Initialization Error', err);
+      console.debug('WebSocket Service: Initialization suppressed.');
     }
   }
 
@@ -95,7 +101,6 @@ export class WebSocketService {
       this.ws.send(JSON.stringify({ type: 'prompt', text }));
       return true;
     }
-    console.warn('WebSocket Service: Cannot send prompt, socket not connected');
     return false;
   }
 }
