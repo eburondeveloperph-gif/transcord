@@ -7,7 +7,6 @@ import React, { useEffect, useRef, useState, memo, useMemo } from 'react';
 import WelcomeScreen from '../welcome-screen/WelcomeScreen';
 import { Modality, LiveServerContent, LiveConnectConfig } from '@google/genai';
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
-import { AudioRecorder } from '../../../lib/audio-recorder';
 import { wsService } from '../../../lib/websocket-service';
 import { audioContext } from '../../../lib/utils';
 import {
@@ -172,7 +171,6 @@ export default function StreamingConsole() {
   const { tools } = useTools();
   const turns = useLogStore(state => state.turns);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [audioRecorder] = useState(() => new AudioRecorder());
   const [chatValue, setChatValue] = useState('');
   
   // Local ref to accumulate audio chunks for the current turn
@@ -219,26 +217,6 @@ export default function StreamingConsole() {
       wsService.off('message', handleRemoteMessage);
     };
   }, [connected, client]);
-
-  useEffect(() => {
-    const onData = (base64: string) => {
-      client.sendRealtimeInput([
-        {
-          mimeType: 'audio/pcm;rate=16000',
-          data: base64,
-        },
-      ]);
-    };
-    if (connected && audioRecorder) {
-      audioRecorder.on('data', onData);
-      audioRecorder.start();
-    } else {
-      audioRecorder.stop();
-    }
-    return () => {
-      audioRecorder.off('data', onData);
-    };
-  }, [connected, client, audioRecorder]);
 
   useEffect(() => {
     const declarations = tools

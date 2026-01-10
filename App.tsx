@@ -3,13 +3,28 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
+import { useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import ControlTray from './components/console/control-tray/ControlTray';
 import ErrorScreen from './components/demo/ErrorScreen';
 import StreamingConsole from './components/demo/streaming-console/StreamingConsole';
-import { LiveAPIProvider } from './contexts/LiveAPIContext';
+import { LiveAPIProvider, useLiveAPIContext } from './contexts/LiveAPIContext';
 
 const API_KEY = process.env.API_KEY;
+
+function ConnectionManager() {
+  const { connect, connected } = useLiveAPIContext();
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    if (!connected && !mounted.current) {
+      mounted.current = true;
+      connect();
+    }
+  }, [connect, connected]);
+
+  return null;
+}
 
 /**
  * Main application component. 
@@ -31,6 +46,7 @@ function App() {
   return (
     <div className="App">
       <LiveAPIProvider apiKey={API_KEY}>
+        <ConnectionManager />
         <Sidebar />
         <ErrorScreen />
         <main className="main-content">
