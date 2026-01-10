@@ -61,6 +61,7 @@ export function useLiveApi({
 
   const audioStreamerRef = useRef<AudioStreamer | null>(null);
   const isConnectingRef = useRef(false);
+  const connectionPromiseRef = useRef<Promise<void> | null>(null);
 
   const [volume, setVolume] = useState(0);
   const [connected, setConnected] = useState(false);
@@ -168,19 +169,39 @@ export function useLiveApi({
   }, [client]);
 
   const connect = useCallback(async () => {
-    if (connected || isConnectingRef.current) {
+    if (connected) return;
+    
+    // Return existing promise if a connection attempt is already in progress
+    if (isConnectingRef.current && connectionPromiseRef.current) {
+      await connectionPromiseRef.current;
       return;
     }
+
     if (!config || Object.keys(config).length === 0) {
       console.warn('Config is empty, delaying connect');
       return;
     }
+
     isConnectingRef.current = true;
+    
+    const connectTask = async () => {
+        try {
+          await client.connect(config);
+        } catch (e) {
+          throw e;
+        } finally {
+          isConnectingRef.current = false;
+          connectionPromiseRef.current = null;
+        }
+    };
+
+    connectionPromiseRef.current = connectTask();
+    
     try {
-      await client.connect(config);
+        await connectionPromiseRef.current;
     } catch (e) {
-      isConnectingRef.current = false;
-      throw e;
+        // Error is already thrown/handled in the task, but re-throw for the caller
+        throw e;
     }
   }, [client, config, connected]);
 

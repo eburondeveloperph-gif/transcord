@@ -91,6 +91,11 @@ export class GenAILiveClient {
         },
         callbacks,
       });
+      // Explicitly set connected status if session is created, 
+      // addressing race condition where onOpen hasn't fired yet.
+      if (this._status === 'connecting') {
+        this._status = 'connected';
+      }
       return true;
     } catch (e: any) {
       this._status = 'disconnected';
