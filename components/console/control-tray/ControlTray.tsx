@@ -6,9 +6,8 @@
 import cn from 'classnames';
 import React, { memo, useEffect, useRef, useState } from 'react';
 import { AudioRecorder } from '../../../lib/audio-recorder';
-import { useLogStore, useUI, useSettings } from '../../../lib/state';
+import { useUI, useSettings } from '../../../lib/state';
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
-import { wsService } from '../../../lib/websocket-service';
 import { playBeep } from '../../../lib/utils';
 
 const MAX_TURN_SECONDS = 30;
@@ -16,21 +15,13 @@ const MAX_TURN_SECONDS = 30;
 function ControlTray() {
   const [audioRecorder] = useState(() => new AudioRecorder());
   const [muted, setMuted] = useState(false);
-  const [textInput, setTextInput] = useState('');
-  const [wsStatus, setWsStatus] = useState(wsService.status);
   const [turnElapsed, setTurnElapsed] = useState(0);
   const connectButtonRef = useRef<HTMLButtonElement>(null);
   const beepedRef = useRef<Set<number>>(new Set());
   const startTimeRef = useRef<number>(0);
 
   const { client, connected, connect, disconnect } = useLiveAPIContext();
-  const { toggleSidebar } = useUI();
   const { voiceFocus, setVoiceFocus } = useSettings();
-
-  useEffect(() => {
-    wsService.on('status', setWsStatus);
-    return () => wsService.off('status', setWsStatus);
-  }, []);
 
   useEffect(() => {
     if (!connected) {
@@ -40,6 +31,13 @@ function ControlTray() {
       startTimeRef.current = 0;
     }
   }, [connected]);
+
+  // Sync Voice Focus state with the AudioRecorder logic
+  useEffect(() => {
+    if (audioRecorder) {
+      audioRecorder.setVoiceFocus(voiceFocus);
+    }
+  }, [audioRecorder, voiceFocus]);
 
   // Turn Timer Logic - Optimized for continuous streaming
   useEffect(() => {
@@ -130,20 +128,6 @@ function ControlTray() {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && textInput.trim()) {
-      if (connected) {
-        client.send([{ text: textInput.trim() }], true);
-        setTextInput('');
-      } else {
-        connect().then(() => {
-          client.send([{ text: textInput.trim() }], true);
-          setTextInput('');
-        });
-      }
-    }
-  };
-
   const progressPercent = Math.min(100, (turnElapsed / MAX_TURN_SECONDS) * 100);
 
   return (
@@ -161,33 +145,6 @@ function ControlTray() {
         )}
 
         <button
-          className="icon-button"
-          onClick={toggleSidebar}
-          aria-label="Settings"
-        >
-          <span className="material-symbols-outlined">settings_suggest</span>
-        </button>
-
-        <div 
-          className={cn('ws-indicator', wsStatus)} 
-          aria-label={`Remote status: ${wsStatus}`}
-        >
-          <span className={cn('material-symbols-outlined', { 'filled': wsStatus === 'connected' })}>
-            {wsStatus === 'connected' ? 'sensors' : wsStatus === 'connecting' ? 'hourglass_top' : 'sensors_off'}
-          </span>
-        </div>
-
-        <input
-          type="text"
-          className="chat-input"
-          value={textInput}
-          onChange={(e) => setTextInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={connected ? 'Type to translate...' : 'Tap bolt to start...'}
-          aria-label="Text to translate"
-        />
-
-        <button
           className={cn('icon-button focus-mode', { active: voiceFocus })}
           onClick={() => setVoiceFocus(!voiceFocus)}
           aria-label={voiceFocus ? "Disable Voice Focus" : "Enable Voice Focus (Neural Sensitivity)"}
@@ -199,7 +156,11 @@ function ControlTray() {
         </button>
 
         <button
-          className={cn('icon-button', { active: !muted && connected, muted: muted && connected })}
+          className={cn('icon-button', { 
+            active: !muted && connected, 
+            muted: muted && connected,
+            'mic-focus': voiceFocus && !muted && connected 
+          })}
           onClick={handleMicClick}
           aria-label={muted ? 'Unmute' : 'Mute'}
         >

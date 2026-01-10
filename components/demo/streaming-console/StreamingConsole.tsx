@@ -1,10 +1,11 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useEffect, useRef, useState, memo, useMemo } from 'react';
-import PopUp from '../popup/PopUp';
+// Fix: Added React import to resolve 'Cannot find namespace React' errors
+import React, { useEffect, useRef, useState, memo, useMemo } from 'react';
 import WelcomeScreen from '../welcome-screen/WelcomeScreen';
 import { Modality, LiveServerContent } from '@google/genai';
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
@@ -173,17 +174,11 @@ export default function StreamingConsole() {
   const { tools } = useTools();
   const turns = useLogStore(state => state.turns);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [showPopUp, setShowPopUp] = useState(true);
   const [audioRecorder] = useState(() => new AudioRecorder());
   const [chatValue, setChatValue] = useState('');
   
   // Local ref to accumulate audio chunks for the current turn
   const currentAudioChunks = useRef<Uint8Array[]>([]);
-
-  const handleClosePopUp = () => {
-    setShowPopUp(false);
-    connect().catch(console.error);
-  };
 
   const handleSendMessage = (text?: string) => {
     const messageText = text || chatValue.trim();
@@ -309,7 +304,7 @@ export default function StreamingConsole() {
       if (!text) return;
 
       const turns = useLogStore.getState().turns;
-      const last = turns.at(-1);
+      const last = turns[turns.length - 1];
 
       if (last?.role === 'agent' && !last.isFinal) {
         updateLastTurn({ text: last.text + text });
@@ -319,7 +314,8 @@ export default function StreamingConsole() {
     };
 
     const handleTurnComplete = () => {
-      const last = useLogStore.getState().turns.at(-1);
+      const turns = useLogStore.getState().turns;
+      const last = turns[turns.length - 1];
       if (last && last.role === 'agent') {
         // Collect current audio chunks and assign to turn
         if (currentAudioChunks.current.length > 0) {
@@ -370,7 +366,6 @@ export default function StreamingConsole() {
 
   return (
     <div className="transcription-container">
-      {showPopUp && <PopUp onClose={handleClosePopUp} />}
       {turns.length === 0 ? (
         <WelcomeScreen />
       ) : (

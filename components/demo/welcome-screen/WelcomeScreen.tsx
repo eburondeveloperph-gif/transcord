@@ -7,6 +7,7 @@
 import React from 'react';
 import './WelcomeScreen.css';
 import { useTools, Template } from '../../../lib/state';
+import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
 
 const welcomeContent: Record<Template, { label: string; title: string; description: string; prompts: string[] }> = {
   'taglish': {
@@ -53,7 +54,7 @@ const welcomeContent: Record<Template, { label: string; title: string; descripti
   },
   'japanese': {
     label: 'Japanese',
-    title: 'Super 翻訳機',
+    title: 'Super 翻訳机',
     description: '自然な日本語へのリアルタイム翻訳。',
     prompts: ["今日はどうですか？", "手伝ってくれますか？", "会議は有意義でした。"],
   },
@@ -150,20 +151,31 @@ const welcomeContent: Record<Template, { label: string; title: string; descripti
   'norwegian': {
     label: 'Norwegian',
     title: 'Superoversetter',
-    description: 'Rask og naturlig oversettelse til norsk.',
+    description: 'Rask og naturlig oversettelse tot norsk.',
     prompts: ["Hvordan har du det i dag?", "Kan du hjelpe meg?", "Møtet var produktivt."],
   },
   'danish': {
     label: 'Danish',
     title: 'Superoversætter',
     description: 'Hurtig og naturlig oversættelse til dansk.',
-    prompts: ["Hvordan har du det i dag?", "Kan du hjælpe mig?", "Mødet var produktivt."],
+    prompts: ["Hvordan har du det i dag?", "Kan du hjelpe meg?", "Mødet var produktivt."],
   }
 };
 
 const WelcomeScreen: React.FC = () => {
   const { template, setTemplate } = useTools();
+  const { connect, client, connected } = useLiveAPIContext();
   const current = welcomeContent[template];
+
+  const handlePromptClick = (text: string) => {
+    if (!connected) {
+      connect().then(() => {
+        client.send([{ text }], true);
+      }).catch(console.error);
+    } else {
+      client.send([{ text }], true);
+    }
+  };
 
   return (
     <div className="welcome-screen">
@@ -184,11 +196,21 @@ const WelcomeScreen: React.FC = () => {
             </select>
           </div>
         </div>
-        <p>{current.description}</p>
-        <div className="example-prompts">
-          {current.prompts.map((prompt, index) => (
-            <div key={index} className="prompt">{prompt}</div>
-          ))}
+        <p className="welcome-description">{current.description}</p>
+        
+        <div className="example-prompts-section">
+          <h5 className="prompts-title">Try a sample phrase</h5>
+          <div className="example-prompts">
+            {current.prompts.map((prompt, index) => (
+              <button 
+                key={index} 
+                className="prompt-card" 
+                onClick={() => handlePromptClick(prompt)}
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

@@ -17,8 +17,8 @@ export class AudioStreamer {
   private checkInterval: number | null = null;
   private scheduledTime: number = 0;
   
-  // REDUCED: Lowered from 0.35s to 0.1s for ultra-low latency playback start.
-  private initialBufferTime: number = 0.1; 
+  // MINIMIZED: Set to 0 for immediate playback.
+  private initialBufferTime: number = 0; 
   
   public gainNode: GainNode;
   public source: AudioBufferSourceNode;
@@ -94,8 +94,8 @@ export class AudioStreamer {
   }
 
   private scheduleNextBuffer() {
-    // REDUCED: Lowered from 0.5s to 0.15s to keep the pipe tight.
-    const SCHEDULE_AHEAD_TIME = 0.15;
+    // REDUCED: Keep the pipe very tight (100ms lookahead).
+    const SCHEDULE_AHEAD_TIME = 0.1;
 
     while (
       this.audioQueue.length > 0 &&

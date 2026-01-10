@@ -15,6 +15,7 @@
   max-width: 600px;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 24px;
   animation: fadeIn 0.8s ease-out;
 }
@@ -26,7 +27,7 @@
 
 .welcome-icon {
   font-size: 56px;
-  background: linear-gradient(135deg, var(--Blue-500), var(--Gold-400));
+  background: linear-gradient(135deg, var(--accent), var(--gold));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 8px;
@@ -37,6 +38,7 @@
   flex-direction: column;
   align-items: center;
   gap: 16px;
+  width: 100%;
 }
 
 .title-selector {
@@ -62,47 +64,69 @@
 
 .title-selector select:hover {
   background: rgba(255, 255, 255, 0.08);
-  border-color: var(--Blue-500);
+  border-color: var(--accent);
 }
 
-.welcome-content p {
-  font-size: 1rem;
+.welcome-description {
+  font-size: 1.1rem;
   line-height: 1.6;
-  opacity: 0.7;
+  opacity: 0.8;
   font-weight: 300;
+  max-width: 80%;
+}
+
+.example-prompts-section {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.prompts-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  opacity: 0.6;
 }
 
 .example-prompts {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 8px;
+  gap: 12px;
+  width: 100%;
 }
 
-.prompt {
-  background-color: rgba(255, 255, 255, 0.02);
-  padding: 12px 16px;
-  border-radius: 14px;
-  font-size: 0.9rem;
-  color: var(--gray-200);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+.prompt-card {
+  background-color: rgba(255, 255, 255, 0.03);
+  padding: 16px 20px;
+  border-radius: 16px;
+  font-size: 0.95rem;
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   transition: all 0.2s;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  line-height: 1.4;
 }
 
-.prompt:hover {
-  background: rgba(255, 255, 255, 0.05);
-  transform: translateY(-2px);
+.prompt-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--accent-dim);
+  transform: translateX(4px);
+  color: white;
 }
 
 @media (min-width: 600px) {
   .welcome-icon { font-size: 72px; }
   .title-selector select { font-size: 1.5rem; padding: 16px 32px; }
   .example-prompts { flex-direction: row; flex-wrap: wrap; justify-content: center; }
-  .prompt { flex: 1; min-width: 160px; }
+  .prompt-card { flex: 1; min-width: 180px; text-align: center; }
 }
 
 @media (max-width: 400px) {
   .welcome-icon { font-size: 48px; }
   .title-selector select { font-size: 1.1rem; }
-  .welcome-content { gap: 16px; }
+  .welcome-content { gap: 20px; }
+  .welcome-description { font-size: 1rem; }
 }
