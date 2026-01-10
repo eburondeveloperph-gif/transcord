@@ -51,14 +51,16 @@ export class AudioRecorder {
 
   private starting: Promise<void> | null = null;
   
-  // Sensitivity Logic Variables
+  // Sensitivity / VAD Logic Variables
   private currentGain: number = 1.0;
   private targetGain: number = 1.0;
-  private noiseFloor: number = 0.01;
+  private noiseFloor: number = 0.005;
+  private isSpeaking: boolean = false;
+  private silenceFrames: number = 0;
   
   // Ducking Logic Variables
-  private volumeMultiplier: number = 1.0; // Current smoothed multiplier
-  private targetVolumeMultiplier: number = 1.0; // Target multiplier
+  private volumeMultiplier: number = 1.0; 
+  private targetVolumeMultiplier: number = 1.0; 
 
   constructor(public sampleRate = 16000) {}
 
@@ -66,47 +68,64 @@ export class AudioRecorder {
     this.targetVolumeMultiplier = multiplier;
   }
 
+  /**
+   * Refined VAD with Hysteresis and Hold-Time.
+   * Ensures accurate pause detection and prevents cutting off sentence endings.
+   */
   private updateSensitivity(volume: number) {
-    // Volume is RMS from the VU meter
-    // Improved Noise Floor Tracking
-    if (volume < this.noiseFloor) {
-      this.noiseFloor = this.noiseFloor * 0.95 + volume * 0.05; 
-    } else if (volume > this.noiseFloor * 2) {
-      // Slow rise for noise floor to adapt to changing environments
-      this.noiseFloor += 0.0001; 
+    // 1. Adaptive Noise Floor Tracking
+    // We update the noise floor slowly during perceived silence.
+    if (!this.isSpeaking) {
+      this.noiseFloor = this.noiseFloor * 0.98 + Math.max(0.001, volume) * 0.02;
     }
 
-    // Heuristic: target a comfortable peak around 0.5-0.7 RMS for the model
-    const TARGET_LEVEL = 0.4;
-    const MIN_GAIN = 0.5;
-    const MAX_GAIN = 4.0;
+    // 2. Hysteresis Thresholds
+    // Higher threshold to start speech, lower threshold to maintain it.
+    const START_THRESHOLD = this.noiseFloor * 3.0 + 0.015;
+    const STOP_THRESHOLD = this.noiseFloor * 1.5 + 0.005;
     
-    // NOISE GATE: If signal is very close to noise floor, squash it.
-    const GATE_THRESHOLD = this.noiseFloor * 1.5;
+    // 3. VAD State Machine
+    if (!this.isSpeaking && volume > START_THRESHOLD) {
+      // Speech Detected
+      this.isSpeaking = true;
+      this.silenceFrames = 0;
+    } else if (this.isSpeaking) {
+      if (volume < STOP_THRESHOLD) {
+        this.silenceFrames++;
+        // HOLD TIME: 10 frames @ 25ms/frame = 250ms "hangover" 
+        // This ensures breathy sentence endings aren't clipped.
+        if (this.silenceFrames > 10) {
+          this.isSpeaking = false;
+        }
+      } else {
+        // Sustaining speech
+        this.silenceFrames = 0;
+      }
+    }
 
-    if (volume > GATE_THRESHOLD + 0.005) { // Active signal detection
-      const adjustmentFactor = TARGET_LEVEL / (volume + 0.001);
+    // 4. Gain Calculation
+    const TARGET_LEVEL = 0.45; // Target RMS level for optimal Gemini performance
+    const MIN_GAIN = 0.4;
+    const MAX_GAIN = 5.0;
+
+    if (this.isSpeaking) {
+      // Normalizing gain to bring quiet speech to a consistent level
+      const adjustmentFactor = TARGET_LEVEL / (Math.max(0.01, volume));
       this.targetGain = Math.max(MIN_GAIN, Math.min(MAX_GAIN, adjustmentFactor));
     } else {
-      // Below gate: aggressively reduce gain to suppress background static
-      // This implements the "Very Good VAD" behavior by cleaning up silence.
+      // Zero-suppression for Very Good VAD
       this.targetGain = 0.0;
     }
 
-    // Smoothly transition current gain to target gain (Attack/Release)
-    // Faster attack for speech, slower release for silence
-    const alpha = this.targetGain > this.currentGain ? 0.2 : 0.05;
-    this.currentGain = this.currentGain * (1 - alpha) + this.targetGain * alpha;
+    // 5. Smooth Gain & Ducking Transitions
+    const gainAlpha = this.targetGain > this.currentGain ? 0.25 : 0.12; // Faster attack, slower release
+    this.currentGain = this.currentGain * (1 - gainAlpha) + this.targetGain * gainAlpha;
     
-    // Smoothly transition volume multiplier for ducking
-    // Alpha of 0.15 gives a nice fade over ~200-300ms
     const duckingAlpha = 0.15;
     this.volumeMultiplier = this.volumeMultiplier * (1 - duckingAlpha) + this.targetVolumeMultiplier * duckingAlpha;
 
-    // Apply combined gain
     const finalGain = this.currentGain * this.volumeMultiplier;
 
-    // Send updated gain to worklet
     if (this.recordingWorklet) {
       this.recordingWorklet.port.postMessage({ gain: finalGain });
     }
@@ -123,7 +142,7 @@ export class AudioRecorder {
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
-            autoGainControl: true, // Native AGC
+            autoGainControl: true,
             channelCount: 1,
             sampleRate: this.sampleRate
           } 
@@ -183,6 +202,8 @@ export class AudioRecorder {
       this.targetGain = 1.0;
       this.volumeMultiplier = 1.0;
       this.targetVolumeMultiplier = 1.0;
+      this.isSpeaking = false;
+      this.silenceFrames = 0;
     };
     if (this.starting) {
       this.starting.then(handleStop).catch(handleStop);
