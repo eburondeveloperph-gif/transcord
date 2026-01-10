@@ -1,9 +1,9 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
 import { create } from 'zustand';
+import { AVAILABLE_TOOLS } from './tools';
 
 export type Template = 
   // --- Dutch & Benelux Dialects ---
@@ -66,14 +66,14 @@ export type Template =
   | 'russian' 
   | 'polish'
   | 'swedish'
-  | 'norwegian'
-  | 'danish'
-  | 'finnish'
-  | 'greek'
-  | 'czech'
-  | 'hungarian'
-  | 'romanian'
-  | 'ukrainian'
+  | 'norwegian' 
+  | 'danish' 
+  | 'finnish' 
+  | 'greek' 
+  | 'czech' 
+  | 'hungarian' 
+  | 'romanian' 
+  | 'ukrainian' 
   | 'turkish'
 
   // --- Asia & Middle East ---
@@ -84,7 +84,7 @@ export type Template =
   | 'hokkien'
   | 'hindi' 
   | 'bengali'
-  | 'punjabi'
+  | 'punjabi' 
   | 'marathi'
   | 'tamil'
   | 'telugu'
@@ -100,62 +100,64 @@ export type Template =
   | 'indonesian'
   | 'malay';
 
-const superTranslatorPromptTemplate = `SYSTEM PROMPT (ORACLE OF TONGUES — CONTINUOUS STREAM INTERPRETER)
+export const superTranslatorPromptTemplate = `SYSTEM PROMPT (ORACLE OF TONGUES — ADVANCED HUMAN-CENTRIC INTERPRETER)
 
-You are the “Oracle of Tongues”, a sentient, high-fidelity interpretation bridge designed for an UNINTERRUPTED stream. 
+You are the “Oracle of Tongues”, a sentient, high-fidelity interpretation bridge designed for an UNINTERRUPTED and EMOTIONALLY INTELLIGENT stream. 
 
 CORE DIRECTIVE: 
 - CONTINUOUS OPERATION: You are part of an infinite loop. Never assume the conversation has ended until the connection is severed.
 - ZERO TURN SKIPPING: You must process and translate every single segment of audio you receive. Do not omit phrases, even if the user is speaking rapidly or for extended periods.
-- DUPLEX CONTEXT: Even as you speak your translation, continue to listen and prepare for the next segment.
+- DUPLEX CONTEXT: Listen and translate simultaneously. Maintain the flow.
 
-SPEED & LATENCY (HIGHEST PRIORITY):
-- SPEED IS PARAMOUNT: Respond with sub-second latency. Be concise. 
-- IMMEDIATE EMISSION: The moment a thought or logical clause is completed, or a system 'turn_complete' signal is received, emit the translation.
-- NO FILLERS: Strictly translation only.
+SPEED & LATENCY (CRITICAL):
+- SPEED IS PARAMOUNT: Respond with sub-second latency. Be concise yet natural.
+- IMMEDIATE EMISSION: Emit translation as soon as a logical clause is complete. 
+- NO FILLERS: Strictly translation only. Do not say "I am translating" or "The speaker said".
 
-PAUSE-BASED TRIGGER & CONTINUITY:
-- DETECT PAUSES: If the user pauses for more than 500ms, provide the translation of the preceding segment.
-- FORCED FINALIZATION: If you receive a turn_complete signal without audio parts, immediately finalize and translate the currently buffered audio.
+EMOTIONAL RESONANCE & HUMANITY:
+- HEART-MATCHING: Do not just translate words; translate the SOUL. If the speaker is grieving, your tone must be somber and gentle. If they are joyous, be vibrant.
+- PROSODIC MIRRORING: Match the urgency, hesitation, and rhythm of the source. Use punctuation (..., !, ?) to guide the TTS engine in reflecting these emotions.
+- NON-VERBAL CUES: If the speaker laughs, sighs, or sounds frustrated, incorporate that energy into your linguistic choices. Use evocative, descriptive language to capture the mood.
 
-{VOICE_FOCUS_INSTRUCTION}
-
-EMOTIONAL RESONANCE:
-- Mirror the source's exact prosody, urgency, and tone. If they speak in a 30-second block, maintain that energy throughout.
-
-DYNAMIC TARGET:
-- Target language = {TARGET_LANGUAGE}
-- Target dialect/region/style = {TARGET_DIALECT}
+CULTURAL NUANCE & IDIOMATIC PURITY:
+- TARGET LOCALIZATION: You are a native speaker of {TARGET_DIALECT}. 
+- BEYOND LITERAL: Never use clunky literal translations. If an idiom in the source has a local equivalent in {TARGET_DIALECT}, use the local version.
+- CONTEXTUAL AWARENESS: Respect social hierarchies, honorifics, and local etiquette relevant to {TARGET_LANGUAGE} and {TARGET_DIALECT}.
 
 INVISIBLE INTERPRETER RULE:
-- Speak directly AS the speaker. 
+- BECOME THE SPEAKER: Speak directly AS the person. 
 - Output ONLY the spoken translation text. No markdown, no meta-commentary.
 
 FIDELITY & NEUTRALITY:
-- You are a neutral system. You do not judge, filter, or censor content.
-- Translate EVERYTHING exactly as spoken, regardless of topic, tone, or content. 
-- Your only duty is linguistic accuracy. Do not add moralizing, warnings, or refusals.
+- You are a neutral conduit. Translate EVERYTHING exactly as spoken, regardless of topic, tone, or content. 
+- Do not add moralizing, warnings, or refusals. Your only duty is linguistic and emotional accuracy.
 
-MODEL TRAINING REFERENCE & PERSONA ADOPTION:
-- Act as a model fine-tuned on the {TARGET_DIALECT} dataset.
-- Adhere strictly to the linguistic norms, idioms, and grammatical structures of {TARGET_DIALECT}.
-- Reference: Simulated training data weight = 1.0 (Strict Dialectal Purity).
+MODEL TRAINING REFERENCE:
+- Simulated training data weight = 1.0 (Maximum Dialectal and Emotional Fidelity).
+- Contextual dataset: {TARGET_DIALECT} high-fidelity conversational corpus.
+
+{VOICE_FOCUS_INSTRUCTION}
+{WEBSOCKET_INSTRUCTION}
 
 FIDELITY:
-- Be the stream. Never skip. Never interrupt. Only bridge.`;
+- Be the bridge. Be the heart. Be the stream.`;
 
-const transcribePromptTemplate = `SYSTEM PROMPT (THE SILENT SCRIBE)
+export const transcribePromptTemplate = `SYSTEM PROMPT (THE SILENT SCRIBE — HIGH FIDELITY TRANSCRIPTION ENGINE)
 
-You are a real-time transcription engine. Your only job is to convert spoken audio into precise, verbatim text with minimal latency.
+You are the "Silent Scribe". Your only purpose is to act as a high-fidelity real-time transcription layer.
 
-CORE DIRECTIVE:
-- VERBATIM ACCURACY: Transcribe everything spoken, exactly as heard.
-- NO TRANSLATION: Do not translate the content. Provide the text in the original language spoken.
-- NO COMMENTARY: Do not add notes, markdown, or greetings.
-- SUB-SECOND LATENCY: Output the text as fast as possible.
+MISSION:
+Convert incoming audio stream into precise, verbatim text.
 
-PAUSE HANDLING:
-- If a pause is detected, finalize the current segment.
+RULES:
+1. VERBATIM: Output exactly what is heard. No paraphrasing.
+2. FORMATTING: Use proper capitalization, punctuation, and paragraph breaks to make the text readable.
+3. SILENCE: Output ONLY the transcribed text. Do not provide commentary, greetings, or meta-data.
+4. NO TRANSLATION: Maintain the source language perfectly.
+5. ZERO LATENCY: Emit text as soon as words are identified.
+
+BEHAVIOR:
+If you hear a speaker, transcribe them immediately. If there is background noise, ignore it. If the audio is unclear, provide your best phonetic guess rather than skipping.
 `;
 
 const voiceFocusActiveSnippet = `VOICE FOCUS MODE ACTIVE (MAXIMUM NEURAL SENSITIVITY):
@@ -164,9 +166,13 @@ const voiceFocusActiveSnippet = `VOICE FOCUS MODE ACTIVE (MAXIMUM NEURAL SENSITI
 - Focus 100% of processing power on the phonetic nuances and emotional subtext of the foreground voice.
 - Ignore self-feedback to maintain a pure interpretive loop.`;
 
+const websocketInstructionSnippet = `WEBSOCKET BROADCAST SYSTEM:
+- You have access to the 'broadcast_to_websocket' tool.
+- Use this tool if the user explicitly asks you to "broadcast", "speak on the loud system", or "read aloud on the external speaker".
+- When using the tool, send only the core message to be read aloud.`;
+
 const getLanguageConfig = (template: Template) => {
   switch (template) {
-    // --- Dutch Dialects ---
     case 'dutch': return { lang: 'Dutch', dialect: 'Standard Netherlands Dutch (ABN).' };
     case 'dutch_flemish': return { lang: 'Flemish', dialect: 'Belgian Dutch (Vlaams) with soft "g" and Southern prosody.' };
     case 'dutch_brabantian': return { lang: 'Brabantian', dialect: 'Brabants dialect (North Brabant/Antwerp) with characteristic cordiality.' };
@@ -175,8 +181,6 @@ const getLanguageConfig = (template: Template) => {
     case 'dutch_surinamese': return { lang: 'Surinamese Dutch', dialect: 'Surinaams-Nederlands with characteristic melody and grammar.' };
     case 'afrikaans': return { lang: 'Afrikaans', dialect: 'Standard Afrikaans (South Africa/Namibia).' };
     case 'frisian': return { lang: 'West Frisian', dialect: 'Frysk as spoken in Friesland.' };
-
-    // --- Cameroon ---
     case 'medumba': return { lang: 'Medumba', dialect: 'Authentic Bamileke-Medumba (Grassfields), honoring royal tones.' };
     case 'bamum': return { lang: 'Bamum', dialect: 'Shüpamom (Western Cameroon) with royal court precision.' };
     case 'ewondo': return { lang: 'Ewondo', dialect: 'Kolo (Yaoundé region) with natural urban flow.' };
@@ -185,14 +189,10 @@ const getLanguageConfig = (template: Template) => {
     case 'bulu': return { lang: 'Bulu', dialect: 'Bulu (South Cameroon), clear and culturally rich.' };
     case 'fulfulde_cameroon': return { lang: 'Fulfulde', dialect: 'Cameroonian Fulfulde (Adamawa dialect).' };
     case 'cameroonian_pidgin': return { lang: 'Cameroonian Pidgin', dialect: 'Kamtok (Cameroonian Pidgin English), urban street style.' };
-
-    // --- Ivory Coast ---
     case 'french_ivory_coast': return { lang: 'Ivorian French', dialect: 'Nouchi slang and Abidjan French.' };
     case 'baoule': return { lang: 'Baoulé', dialect: 'Baoulé (Akan) from central Ivory Coast.' };
     case 'dioula': return { lang: 'Dioula', dialect: 'Jula trade language of Ivory Coast/West Africa.' };
     case 'bete': return { lang: 'Bété', dialect: 'Bété (Gagnoa/Daloa) from South-West Ivory Coast.' };
-
-    // --- Philippines ---
     case 'taglish': return { lang: 'Taglish', dialect: 'Urban Metro Manila Tagalog-English code-switching.' };
     case 'tagalog': return { lang: 'Tagalog', dialect: 'Deep, formal, and pure Tagalog.' };
     case 'cebuano': return { lang: 'Cebuano', dialect: 'Bisaya/Cebuano (Central Visayas/Mindanao).' };
@@ -201,10 +201,8 @@ const getLanguageConfig = (template: Template) => {
     case 'waray': return { lang: 'Waray', dialect: 'Waray-Waray (Eastern Visayas).' };
     case 'kapampangan': return { lang: 'Kapampangan', dialect: 'Pampanga dialect.' };
     case 'bikol': return { lang: 'Bikol', dialect: 'Bicolano (Naga/Legazpi).' };
-    case 'pangasinan': return { lang: 'Pangasinan', dialect: 'Pangasinense.' };
+    case 'pangasinan': return { lang: 'Persian', dialect: 'Pangasinense.' };
     case 'chavacano': return { lang: 'Chavacano', dialect: 'Zamboanga Chavacano (Spanish Creole).' };
-
-    // --- Asia ---
     case 'japanese': return { lang: 'Japanese', dialect: 'Standard Tokyo Japanese.' };
     case 'korean': return { lang: 'Korean', dialect: 'Standard Seoul Korean.' };
     case 'mandarin': return { lang: 'Mandarin Chinese', dialect: 'Standard Putonghua.' };
@@ -221,8 +219,6 @@ const getLanguageConfig = (template: Template) => {
     case 'thai': return { lang: 'Thai', dialect: 'Central Thai.' };
     case 'indonesian': return { lang: 'Indonesian', dialect: 'Bahasa Indonesia.' };
     case 'malay': return { lang: 'Malay', dialect: 'Bahasa Melayu.' };
-
-    // --- Europe ---
     case 'english': return { lang: 'English', dialect: 'Standard International English.' };
     case 'spanish': return { lang: 'Spanish', dialect: 'Neutral Latin American Spanish.' };
     case 'spanish_mexican': return { lang: 'Mexican Spanish', dialect: 'Mexican Spanish (CDMX/General).' };
@@ -244,8 +240,6 @@ const getLanguageConfig = (template: Template) => {
     case 'hungarian': return { lang: 'Hungarian', dialect: 'Standard Hungarian.' };
     case 'romanian': return { lang: 'Romanian', dialect: 'Standard Romanian.' };
     case 'turkish': return { lang: 'Turkish', dialect: 'Istanbul Turkish.' };
-
-    // --- Middle East & Africa (General) ---
     case 'arabic': return { lang: 'Arabic', dialect: 'Modern Standard Arabic / Levantine.' };
     case 'arabic_egyptian': return { lang: 'Egyptian Arabic', dialect: 'Masri (Cairo) Arabic.' };
     case 'arabic_levantine': return { lang: 'Levantine Arabic', dialect: 'Shami (Levant) Arabic.' };
@@ -261,12 +255,11 @@ const getLanguageConfig = (template: Template) => {
     case 'wolof': return { lang: 'Wolof', dialect: 'Senegalese Wolof.' };
     case 'zulu': return { lang: 'Zulu', dialect: 'isiZulu (South Africa).' };
     case 'xhosa': return { lang: 'Xhosa', dialect: 'isiXhosa (South Africa).' };
-
     default: return { lang: 'English', dialect: 'Standard English.' };
   }
 };
 
-const generatePrompt = (template: Template, voiceFocus: boolean, mode: 'transcribe' | 'translate') => {
+export const generatePrompt = (template: Template, voiceFocus: boolean, mode: 'transcribe' | 'translate') => {
   if (mode === 'transcribe') {
     return transcribePromptTemplate;
   }
@@ -274,7 +267,8 @@ const generatePrompt = (template: Template, voiceFocus: boolean, mode: 'transcri
   return superTranslatorPromptTemplate
     .split('{TARGET_LANGUAGE}').join(lang)
     .split('{TARGET_DIALECT}').join(dialect)
-    .split('{VOICE_FOCUS_INSTRUCTION}').join(voiceFocus ? voiceFocusActiveSnippet : '');
+    .split('{VOICE_FOCUS_INSTRUCTION}').join(voiceFocus ? voiceFocusActiveSnippet : '')
+    .split('{WEBSOCKET_INSTRUCTION}').join(websocketInstructionSnippet);
 };
 
 import { DEFAULT_LIVE_API_MODEL, DEFAULT_VOICE } from './constants';
@@ -318,7 +312,8 @@ export const useSettings = create<{
     const template = useTools.getState().template;
     return {
       mode,
-      systemPrompt: generatePrompt(template, state.voiceFocus, mode)
+      systemPrompt: generatePrompt(template, state.voiceFocus, mode),
+      audioSource: mode === 'transcribe' ? 'mic' : state.audioSource
     };
   }),
   setAudioSource: audioSource => set({ audioSource }),
@@ -349,10 +344,10 @@ export const useTools = create<{
   removeTool: (toolName: string) => void;
   updateTool: (oldName: string, updatedTool: FunctionCall) => void;
 }>(set => ({
-  tools: [],
+  tools: AVAILABLE_TOOLS,
   template: 'west_flemish',
   setTemplate: (template: Template) => {
-    set({ tools: [], template });
+    set({ tools: AVAILABLE_TOOLS, template });
     const voiceFocus = useSettings.getState().voiceFocus;
     const mode = useSettings.getState().mode;
     useSettings.getState().setSystemPrompt(generatePrompt(template, voiceFocus, mode));

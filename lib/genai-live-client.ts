@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -54,7 +53,7 @@ export class GenAILiveClient {
 
   public readonly model: string = DEFAULT_LIVE_API_MODEL;
 
-  protected readonly client: GoogleGenAI;
+  protected client?: GoogleGenAI;
   protected session?: Session;
 
   private _status: 'connected' | 'disconnected' | 'connecting' = 'disconnected';
@@ -64,16 +63,20 @@ export class GenAILiveClient {
 
   constructor(apiKey: string, model?: string) {
     if (model) this.model = model;
-
-    this.client = new GoogleGenAI({
-      apiKey: apiKey,
-    });
+    // We will initialize/re-initialize the client on connect to ensure fresh credentials
   }
 
-  public async connect(config: LiveConnectConfig): Promise<boolean> {
+  public async connect(config: LiveConnectConfig, apiKeyOverride?: string): Promise<boolean> {
     if (this._status === 'connected' || this._status === 'connecting') {
       return true;
     }
+
+    const currentApiKey = apiKeyOverride || process.env.API_KEY || '';
+    
+    // Always create a fresh instance right before connecting to avoid stale project contexts
+    this.client = new GoogleGenAI({
+      apiKey: currentApiKey,
+    });
 
     this._status = 'connecting';
     const callbacks: LiveCallbacks = {
@@ -91,8 +94,7 @@ export class GenAILiveClient {
         },
         callbacks,
       });
-      // Explicitly set connected status if session is created, 
-      // addressing race condition where onOpen hasn't fired yet.
+      
       if (this._status === 'connecting') {
         this._status = 'connected';
       }
@@ -101,7 +103,6 @@ export class GenAILiveClient {
       this._status = 'disconnected';
       this.session = undefined;
       
-      // Extract a meaningful error message
       let errorMsg = 'Network error: Connection failed';
       if (e instanceof Error) {
         errorMsg = e.message;
@@ -137,8 +138,6 @@ export class GenAILiveClient {
       this.emitter.emit('error', new ErrorEvent('error', { message: 'Client not connected' }));
       return;
     }
-    // Correct structure for sendClientContent is { turns: Content[], turnComplete: boolean }
-    // where Content is { parts: Part[] }
     const partsArray = Array.isArray(parts) ? parts : [parts];
     this.session.sendClientContent({ 
       turns: [{ parts: partsArray }], 

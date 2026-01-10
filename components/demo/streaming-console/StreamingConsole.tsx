@@ -1,10 +1,9 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
 import React, { useEffect, useRef, useState, memo, useMemo } from 'react';
-import { Modality, LiveServerContent, LiveConnectConfig } from '@google/genai';
+import { LiveServerContent } from '@google/genai';
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
 import { wsService } from '../../../lib/websocket-service';
 import { audioContext } from '../../../lib/utils';
@@ -13,7 +12,6 @@ import {
   useLogStore,
   useTools,
   Template,
-  ConversationTurn
 } from '../../../lib/state';
 import { AVAILABLE_VOICES } from '../../../lib/constants';
 
@@ -31,6 +29,7 @@ const formatDuration = (seconds: number) => {
 };
 
 const renderContent = (text: string) => {
+  if (!text) return null;
   const boldParts = text.split(/(\*\*.*?\*\*)/g);
   return boldParts.map((boldPart, boldIndex) => {
     if (boldPart.startsWith('**') && boldPart.endsWith('**')) {
@@ -285,9 +284,9 @@ const LANGUAGE_LABELS: Record<Template, string> = {
 };
 
 export default function StreamingConsole() {
-  const { client, setConfig, connected, connect } = useLiveAPIContext();
-  const { systemPrompt, voice, setVoice, mode, setMode, audioSource, setAudioSource } = useSettings();
-  const { template, setTemplate, tools } = useTools();
+  const { client, connected } = useLiveAPIContext();
+  const { voice, setVoice, mode, audioSource, setAudioSource } = useSettings();
+  const { template, setTemplate } = useTools();
   const turns = useLogStore(state => state.turns);
   const scrollRef = useRef<HTMLDivElement>(null);
   const transcribeScrollRef = useRef<HTMLDivElement>(null);
@@ -295,14 +294,15 @@ export default function StreamingConsole() {
   const currentAudioChunks = useRef<Uint8Array[]>([]);
 
   const handleSendMessage = (text: string) => {
-    if (text.trim()) {
-      if (connected) {
-        client.send([{ text }], true);
-      } else {
-        connect().then(() => {
-          client.send([{ text }], true);
-        }).catch(console.error);
-      }
+    if (text.trim() && connected) {
+      client.send([{ text }], true);
+    }
+  };
+
+  const handleBroadcast = (text: string) => {
+    const success = wsService.sendPrompt(text);
+    if (!success) {
+      alert('WebSocket is not connected. Ensure the read-aloud system is running.');
     }
   };
 
@@ -313,7 +313,7 @@ export default function StreamingConsole() {
           handleSendMessage(text.trim());
           useLogStore.getState().addTurn({
             role: 'system',
-            text: `📡 WebSocket Stream: "${text}"`,
+            text: `📡 Remote Stream: "${text}"`,
             isFinal: true
           });
         } else {
@@ -335,39 +335,11 @@ export default function StreamingConsole() {
   }, [connected, client, mode]);
 
   useEffect(() => {
-    const declarations = tools
-      .filter(tool => tool.isEnabled)
-      .map(tool => ({
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.parameters,
-      }));
-
-    const config: LiveConnectConfig = {
-      responseModalities: [Modality.AUDIO],
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: {
-            voiceName: voice,
-          },
-        },
-      },
-      inputAudioTranscription: {},
-      outputAudioTranscription: {},
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-    };
-
-    if (declarations.length > 0) {
-      config.tools = [{ functionDeclarations: declarations }];
-    }
-
-    setConfig(config);
-  }, [setConfig, systemPrompt, tools, voice]);
-
-  useEffect(() => {
     const { addTurn, updateLastTurn } = useLogStore.getState();
 
     const handleInputTranscription = (text: string, isFinal: boolean) => {
+      // Note: In transcribe mode, we often prefer the model's high-fidelity scribe output (agent)
+      // but we still capture input transcription for redundancy or user role display.
       const turns = useLogStore.getState().turns;
       const last = turns[turns.length - 1];
       if (last && last.role === 'user' && !last.isFinal) {
@@ -399,6 +371,7 @@ export default function StreamingConsole() {
       const turns = useLogStore.getState().turns;
       const last = turns.at(-1);
 
+      // In Transcribe mode, the agent's content IS the transcription.
       if (last?.role === 'agent' && !last.isFinal) {
         updateLastTurn({ text: last.text + text });
       } else {
@@ -466,6 +439,9 @@ export default function StreamingConsole() {
   const filteredTranscribeTurns = useMemo(() => {
     if (mode !== 'transcribe') return [];
     return turns.filter(t => {
+      // In Transcribe mode, we prioritize 'agent' turns as they contain the scribe's output
+      if (t.role === 'agent') return true;
+      
       if (audioSource === 'both') return t.role === 'user' || t.role === 'remote';
       if (audioSource === 'mic') return t.role === 'user';
       if (audioSource === 'speaker') return t.role === 'remote';
@@ -475,25 +451,8 @@ export default function StreamingConsole() {
 
   return (
     <div className="transcription-container">
-      {/* Tab Switcher */}
-      <nav className="tab-bar">
-        <button 
-          className={`tab-button ${mode === 'transcribe' ? 'active' : ''}`}
-          onClick={() => setMode('transcribe')}
-        >
-          Transcribe
-        </button>
-        <button 
-          className={`tab-button ${mode === 'translate' ? 'active' : ''}`}
-          onClick={() => setMode('translate')}
-        >
-          Translate
-        </button>
-      </nav>
-
       {mode === 'translate' ? (
         <>
-          {/* Translate Header Controls */}
           <div className="top-controls">
             <div className="selector-group">
               <span className="selector-label">Target Language</span>
@@ -534,7 +493,7 @@ export default function StreamingConsole() {
             {turns.length === 0 && (
               <div className="transcription-entry system">
                 <div className="transcription-text-content">
-                  Oracle is listening. Ready for your voice...
+                  Waiting for interpretation stream...
                 </div>
               </div>
             )}
@@ -555,51 +514,36 @@ export default function StreamingConsole() {
                   {renderContent(t.text)}
                 </div>
                 
-                {t.role === 'agent' && t.audioData && (
-                  <PlaybackControls audioData={t.audioData} />
-                )}
+                <div className="transcription-footer-actions">
+                  {t.role === 'agent' && t.audioData && (
+                    <PlaybackControls audioData={t.audioData} />
+                  )}
+                  {(t.role === 'agent' || t.role === 'user') && (
+                    <button 
+                      className="broadcast-btn-mini"
+                      onClick={() => handleBroadcast(t.text)}
+                      title="Broadcast to External Speaker"
+                    >
+                      <span className="material-symbols-outlined">campaign</span>
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         </>
       ) : (
-        /* Transcribe View */
+        /* Transcribe Mode View */
         <>
-          <div className="source-selector">
-            <button 
-              className={`source-button ${audioSource === 'mic' ? 'active' : ''}`}
-              onClick={() => setAudioSource('mic')}
-            >
-              <span className="material-symbols-outlined">mic</span>
-              Mic
-            </button>
-            <button 
-              className={`source-button ${audioSource === 'speaker' ? 'active' : ''}`}
-              onClick={() => setAudioSource('speaker')}
-            >
-              <span className="material-symbols-outlined">speaker</span>
-              Speaker
-            </button>
-            <button 
-              className={`source-button ${audioSource === 'both' ? 'active' : ''}`}
-              onClick={() => setAudioSource('both')}
-            >
-              <span className="material-symbols-outlined">settings_input_component</span>
-              Both
-            </button>
-          </div>
-          
           <div className="transcribe-view" ref={transcribeScrollRef}>
              <div className="transcribe-text-large">
                {filteredTranscribeTurns.length === 0 ? (
                  <div className="transcription-entry system">
-                   {audioSource === 'mic' ? 'Microphone active. Speak now...' : 
-                    audioSource === 'speaker' ? 'WebSocket stream active. Waiting...' : 
-                    'Engine ready. Awaiting input stream...'}
+                   Engine ready. Microphone empowered. Awaiting speech...
                  </div>
                ) : (
                  filteredTranscribeTurns.map((t, i) => (
-                   <span key={i} className={`transcribe-word ${t.isFinal ? 'final' : ''} ${t.role === 'remote' ? 'remote' : ''}`}>
+                   <span key={i} className={`transcribe-word ${t.isFinal ? 'final' : ''} ${t.role === 'remote' ? 'remote' : ''} ${t.role === 'agent' ? 'scribe' : ''}`}>
                      {t.text}{' '}
                    </span>
                  ))

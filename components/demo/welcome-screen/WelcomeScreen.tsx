@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -9,11 +8,10 @@ import './WelcomeScreen.css';
 import { useTools, Template } from '../../../lib/state';
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
 
-// Helper to generate default content for missing keys
 const getContent = (template: Template) => {
   const defaults = {
     title: 'Super Translator',
-    description: `Real-time, high-fidelity translation engine.`,
+    description: `Real-time, high-fidelity translation engine. Connect to start the conversation.`,
     prompts: ["Hello, how are you?", "Can you help me?", "This is amazing."]
   };
 
@@ -82,7 +80,7 @@ const WelcomeScreen: React.FC = () => {
       connect().then(() => {
         setTimeout(() => {
           client.send([{ text }], true);
-        }, 100);
+        }, 300);
       }).catch(console.error);
     } else {
       client.send([{ text }], true);
@@ -93,18 +91,18 @@ const WelcomeScreen: React.FC = () => {
     <div className="welcome-screen">
       <div className="welcome-content">
         <div className="title-container">
-          <span className="welcome-icon">translate</span>
-          <h1 style={{ fontWeight: 900, textTransform: 'uppercase', color: 'var(--accent)' }}>Ready for Stream</h1>
+          <span className="material-symbols-outlined welcome-icon">translate</span>
+          <h1 className="ready-title">Ready</h1>
         </div>
         <p className="welcome-description">{current.description}</p>
         
         <button className="launch-button" onClick={handleLaunch}>
           <span className="material-symbols-outlined filled">bolt</span>
-          <span>Open Connection</span>
+          <span>Connect</span>
         </button>
 
         <div className="example-prompts-section">
-          <h5 className="prompts-title">Try a sample phrase</h5>
+          <h5 className="prompts-title">Try it out</h5>
           <div className="example-prompts">
             {current.prompts.map((prompt, index) => (
               <button 

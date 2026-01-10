@@ -1,16 +1,28 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useUI } from '../lib/state';
+import { useSettings } from '../lib/state';
 import { wsService } from '../lib/websocket-service';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import cn from 'classnames';
+import { useLiveAPIContext } from '../contexts/LiveAPIContext';
 
 export default function Header() {
-  const { toggleSidebar } = useUI();
+  const { mode, setMode } = useSettings();
+  const { connected, disconnect } = useLiveAPIContext();
+  
   const [wsStatus, setWsStatus] = useState(wsService.status);
+
+  // Switching modes MUST deactivate the previous session for the current user
+  const handleTabSwitch = useCallback((newMode: 'transcribe' | 'translate') => {
+    if (newMode !== mode) {
+      if (connected) {
+        disconnect();
+      }
+      setMode(newMode);
+    }
+  }, [mode, connected, disconnect, setMode]);
 
   useEffect(() => {
     wsService.on('status', setWsStatus);
@@ -18,27 +30,29 @@ export default function Header() {
   }, []);
 
   return (
-    <header>
-      <div className="header-left">
-        <h1>Super Translator</h1>
-      </div>
-      <div className="header-right">
-        <div 
-          className={cn('ws-indicator', wsStatus)} 
-          aria-label={`Remote status: ${wsStatus}`}
-          title={`WebSocket Status: ${wsStatus}`}
+    <header className="main-header">
+      <div className="header-tabs">
+        <button 
+          className={cn('tab-button-minimal', { active: mode === 'transcribe' })}
+          onClick={() => handleTabSwitch('transcribe')}
         >
-          <span className={cn('material-symbols-outlined', { 'filled': wsStatus === 'connected' })}>
-            {wsStatus === 'connected' ? 'sensors' : wsStatus === 'connecting' ? 'hourglass_top' : 'sensors_off'}
-          </span>
-        </div>
-        <button
-          className="settings-button"
-          onClick={toggleSidebar}
-          aria-label="Settings"
-        >
-          <span className="material-symbols-outlined">settings</span>
+          Transcribe
         </button>
+        <button 
+          className={cn('tab-button-minimal', { active: mode === 'translate' })}
+          onClick={() => handleTabSwitch('translate')}
+        >
+          Translate
+        </button>
+      </div>
+
+      <div className="header-actions-area">
+        <div className="header-icons-group">
+          <div 
+            className={cn('ws-status-dot', wsStatus)} 
+            title={`Remote Stream Status: ${wsStatus}`}
+          />
+        </div>
       </div>
     </header>
   );

@@ -1,27 +1,10 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-/**
- * Copyright 2024 Google LLC
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GenAILiveClient } from '../../lib/genai-live-client';
-import { LiveConnectConfig, Modality, LiveServerToolCall } from '@google/genai';
+import { LiveConnectConfig, LiveServerToolCall } from '@google/genai';
 import { AudioStreamer } from '../../lib/audio-streamer';
 import { audioContext } from '../../lib/utils';
 import VolMeterWorket from '../../lib/worklets/vol-meter';
@@ -45,12 +28,11 @@ export function useLiveApi({
 }: {
   apiKey: string;
 }): UseLiveApiResults {
-  const { model } = useSettings();
+  const { model, mode } = useSettings();
   
-  // Initialize client and handle cleanup
   const client = useMemo(() => {
-    const newClient = new GenAILiveClient(apiKey, model);
-    return newClient;
+    // Note: The client now handles internal fresh instance creation of GoogleGenAI on connect
+    return new GenAILiveClient(apiKey, model);
   }, [apiKey, model]);
 
   useEffect(() => {
@@ -68,23 +50,18 @@ export function useLiveApi({
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [config, setConfig] = useState<LiveConnectConfig>({});
 
-  // register audio for streaming server -> speakers
   useEffect(() => {
     if (!audioStreamerRef.current) {
       audioContext({ id: 'audio-out' }).then((audioCtx: AudioContext) => {
         const streamer = new AudioStreamer(audioCtx);
         audioStreamerRef.current = streamer;
         
-        // Setup state listeners for AI speaking status
         streamer.onPlay = () => setIsAiSpeaking(true);
         streamer.onStop = () => setIsAiSpeaking(false);
 
         streamer
           .addWorklet<any>('vumeter-out', VolMeterWorket, (ev: any) => {
             setVolume(ev.data.volume);
-          })
-          .then(() => {
-            // Successfully added worklet
           })
           .catch(err => {
             console.error('Error adding worklet:', err);
@@ -104,33 +81,31 @@ export function useLiveApi({
       isConnectingRef.current = false;
     };
 
-    const stopAudioStreamer = () => {
-      // We explicitly DO NOT stop the audio streamer on interruption
-    };
-
     const onAudio = (data: ArrayBuffer) => {
-      if (audioStreamerRef.current) {
+      if (audioStreamerRef.current && mode !== 'transcribe') {
         audioStreamerRef.current.addPCM16(new Uint8Array(data));
       }
     };
 
-    const onError = () => {
+    const onError = (e: any) => {
       setConnected(false);
       isConnectingRef.current = false;
+      
+      // Handle permission errors by potentially hinting to re-select key
+      if (e?.message?.includes('permission') || e?.message?.includes('403')) {
+        console.warn('Permission denied. Ensure your API Key is from a paid GCP project.');
+      }
     };
 
-    // Bind event listeners
     client.on('open', onOpen);
     client.on('close', onClose);
     client.on('error', onError);
-    client.on('interrupted', stopAudioStreamer);
     client.on('audio', onAudio);
 
     const onToolCall = (toolCall: LiveServerToolCall) => {
       const functionResponses: any[] = [];
 
       for (const fc of toolCall.functionCalls) {
-        // Special Handling for WebSocket Broadcasting
         if (fc.name === 'broadcast_to_websocket') {
           const text = (fc.args as any).text;
           const success = wsService.sendPrompt(text);
@@ -142,10 +117,7 @@ export function useLiveApi({
           continue;
         }
 
-        // Generic Logging for other tools
-        const triggerMessage = `Triggering function call: **${
-          fc.name
-        }**\n\`\`\`json\n${JSON.stringify(fc.args, null, 2)}\n\`\`\``;
+        const triggerMessage = `Triggering function call: **${fc.name}**\n\`\`\`json\n${JSON.stringify(fc.args, null, 2)}\n\`\`\``;
         useLogStore.getState().addTurn({
           role: 'system',
           text: triggerMessage,
@@ -165,20 +137,17 @@ export function useLiveApi({
     client.on('toolcall', onToolCall);
 
     return () => {
-      // Clean up event listeners
       client.off('open', onOpen);
       client.off('close', onClose);
       client.off('error', onError);
-      client.off('interrupted', stopAudioStreamer);
       client.off('audio', onAudio);
       client.off('toolcall', onToolCall);
     };
-  }, [client]);
+  }, [client, mode]);
 
   const connect = useCallback(async () => {
     if (connected) return;
     
-    // Return existing promise if a connection attempt is already in progress
     if (isConnectingRef.current && connectionPromiseRef.current) {
       await connectionPromiseRef.current;
       return;
@@ -193,7 +162,8 @@ export function useLiveApi({
     
     const connectTask = async () => {
         try {
-          await client.connect(config);
+          // Use the current API_KEY from process.env right before connecting
+          await client.connect(config, process.env.API_KEY || apiKey);
         } catch (e) {
           throw e;
         } finally {
@@ -207,16 +177,15 @@ export function useLiveApi({
     try {
         await connectionPromiseRef.current;
     } catch (e) {
-        // Error is already thrown/handled in the task, but re-throw for the caller
         throw e;
     }
-  }, [client, config, connected]);
+  }, [client, config, connected, apiKey]);
 
   const disconnect = useCallback(async () => {
     client.disconnect();
     setConnected(false);
     isConnectingRef.current = false;
-  }, [setConnected, client]);
+  }, [client]);
 
   return {
     client,

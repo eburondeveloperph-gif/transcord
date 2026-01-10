@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -8,6 +7,7 @@ import React, { memo, useEffect, useRef, useState } from 'react';
 import { AudioRecorder } from '../../../lib/audio-recorder';
 import { useUI, useSettings } from '../../../lib/state';
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
+import { wsService } from '../../../lib/websocket-service';
 
 function ControlTray() {
   const [audioRecorder] = useState(() => new AudioRecorder());
@@ -17,7 +17,7 @@ function ControlTray() {
 
   const { client, connected, connect, disconnect, isAiSpeaking } = useLiveAPIContext();
   const { toggleSidebar, isSidebarOpen } = useUI();
-  const { voiceFocus, setVoiceFocus } = useSettings();
+  const { voiceFocus, setVoiceFocus, mode } = useSettings();
 
   useEffect(() => {
     if (!connected) {
@@ -25,27 +25,35 @@ function ControlTray() {
     }
   }, [connected]);
 
+  // Enforce mode-specific microphone defaults
+  useEffect(() => {
+    if (mode === 'translate') {
+      setMuted(true);
+    } else if (mode === 'transcribe') {
+      setMuted(false);
+    }
+  }, [mode]);
+
+  // Unified Recording Logic
   useEffect(() => {
     if (audioRecorder) {
       audioRecorder.setVoiceFocus(voiceFocus);
+      audioRecorder.setMode(mode);
     }
-  }, [voiceFocus, audioRecorder]);
+  }, [voiceFocus, mode, audioRecorder]);
 
   useEffect(() => {
     if (audioRecorder && connected && !muted) {
+      // Dynamic ducking
       audioRecorder.setVolumeMultiplier(isAiSpeaking ? 0.15 : 1.0);
     }
   }, [isAiSpeaking, audioRecorder, connected, muted]);
 
   useEffect(() => {
     const onData = (base64: string) => {
-      client.sendRealtimeInput([
-        {
-          mimeType: 'audio/pcm;rate=16000',
-          data: base64,
-        },
-      ]);
+      client.sendRealtimeInput([{ mimeType: 'audio/pcm;rate=16000', data: base64 }]);
     };
+    
     if (connected && !muted && audioRecorder) {
       audioRecorder.on('data', onData);
       audioRecorder.start();
@@ -80,6 +88,18 @@ function ControlTray() {
     }
   };
 
+  const handleBroadcast = () => {
+    const text = chatValue.trim();
+    if (text) {
+      const success = wsService.sendPrompt(text);
+      if (success) {
+        setChatValue('');
+      } else {
+        alert('WebSocket is not connected. Ensure the read-aloud system is running.');
+      }
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleSendMessage();
@@ -88,12 +108,12 @@ function ControlTray() {
 
   return (
     <section className="control-tray-floating">
-      <div className={cn('floating-pill', { 'connected': connected })}>
+      <div className={cn('floating-pill', { 'connected': connected, 'compact': mode === 'transcribe' })}>
         
         <button
           className={cn('icon-button', { active: isSidebarOpen })}
           onClick={toggleSidebar}
-          aria-label="Preferences"
+          aria-label="Settings"
           title="Linguistic Preferences"
         >
           <span className="material-symbols-outlined">settings</span>
@@ -110,22 +130,35 @@ function ControlTray() {
           </span>
         </button>
 
-        <div className="chat-input-wrapper">
-          <input
-            type="text"
-            className="chat-input"
-            placeholder="Type message..."
-            value={chatValue}
-            onChange={(e) => setChatValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-          <span 
-            className="material-symbols-outlined chat-send-icon"
-            onClick={handleSendMessage}
-          >
-            send
-          </span>
-        </div>
+        {mode === 'translate' && (
+          <div className="chat-input-wrapper">
+            <input
+              type="text"
+              className="chat-input"
+              placeholder="Translate message..."
+              value={chatValue}
+              onChange={(e) => setChatValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+            />
+            <div className="chat-actions">
+              <span 
+                className="material-symbols-outlined chat-send-icon"
+                onClick={handleBroadcast}
+                title="Broadcast to Loudspeaker"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                campaign
+              </span>
+              <span 
+                className="material-symbols-outlined chat-send-icon"
+                onClick={handleSendMessage}
+                title="Send to Translator"
+              >
+                send
+              </span>
+            </div>
+          </div>
+        )}
 
         <button
           className={cn('icon-button', { 
