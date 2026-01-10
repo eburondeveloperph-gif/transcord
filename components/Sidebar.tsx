@@ -80,7 +80,7 @@ const getVoiceAlias = (voiceId: string) => VOICE_ALIASES[voiceId] || `Persona ${
 
 export default function Sidebar() {
   const { isSidebarOpen, toggleSidebar } = useUI();
-  const { systemPrompt, voice, voiceFocus, setSystemPrompt, setVoice } = useSettings();
+  const { systemPrompt, voice, voiceFocus, setSystemPrompt, setVoice, setVoiceFocus } = useSettings();
   const { tools, template, setTemplate, toggleTool, updateTool } = useTools();
   const { connected } = useLiveAPIContext();
 
@@ -133,6 +133,18 @@ export default function Sidebar() {
                 </select>
                 {voiceFocus && <div className="focus-badge">High Precision Active</div>}
               </label>
+
+              <div className="tool-item" style={{ marginBottom: '28px' }}>
+                <div className="tool-item-info">
+                  <input
+                    type="checkbox"
+                    id="voice-focus-toggle"
+                    checked={voiceFocus}
+                    onChange={(e) => setVoiceFocus(e.target.checked)}
+                  />
+                  <label htmlFor="voice-focus-toggle">Neural Sensitivity (Voice Focus)</label>
+                </div>
+              </div>
 
               <label className="sidebar-label">
                 Neural Persona (Voice)

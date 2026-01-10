@@ -5,7 +5,7 @@
 */
 import React, { useEffect, useRef, useState, memo, useMemo } from 'react';
 import WelcomeScreen from '../welcome-screen/WelcomeScreen';
-import { Modality, LiveServerContent } from '@google/genai';
+import { Modality, LiveServerContent, LiveConnectConfig } from '@google/genai';
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
 import { AudioRecorder } from '../../../lib/audio-recorder';
 import { wsService } from '../../../lib/websocket-service';
@@ -249,9 +249,9 @@ export default function StreamingConsole() {
         parameters: tool.parameters,
       }));
 
-    // Create the config object matching LiveConnectConfig
-    // Note: thinkingConfig is removed as it can cause 'invalid argument' on some models/endpoints
-    const config: any = {
+    // Construct the config strictly according to the LiveConnectConfig interface
+    // to avoid sending undefined keys or invalid structures.
+    const config: LiveConnectConfig = {
       responseModalities: [Modality.AUDIO],
       speechConfig: {
         voiceConfig: {
@@ -263,9 +263,12 @@ export default function StreamingConsole() {
       inputAudioTranscription: {},
       outputAudioTranscription: {},
       systemInstruction: { parts: [{ text: systemPrompt }] },
-      // Only include tools if there are declarations
-      tools: declarations.length > 0 ? [{ functionDeclarations: declarations }] : undefined,
     };
+
+    // Only add tools if there are valid declarations
+    if (declarations.length > 0) {
+      config.tools = [{ functionDeclarations: declarations }];
+    }
 
     setConfig(config);
   }, [setConfig, systemPrompt, tools, voice]);

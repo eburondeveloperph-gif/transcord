@@ -6,7 +6,7 @@
 import cn from 'classnames';
 import React, { memo, useEffect, useRef, useState } from 'react';
 import { AudioRecorder } from '../../../lib/audio-recorder';
-import { useUI, useSettings } from '../../../lib/state';
+import { useUI } from '../../../lib/state';
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
 
 function ControlTray() {
@@ -15,7 +15,7 @@ function ControlTray() {
   const connectButtonRef = useRef<HTMLButtonElement>(null);
 
   const { client, connected, connect, disconnect } = useLiveAPIContext();
-  const { voiceFocus, setVoiceFocus } = useSettings();
+  const { toggleSidebar, isSidebarOpen } = useUI();
 
   useEffect(() => {
     if (!connected) {
@@ -53,16 +53,13 @@ function ControlTray() {
 
   return (
     <section className="control-tray-floating">
-      <div className={cn('floating-pill', { 'focus-active': voiceFocus && connected })}>
+      <div className={cn('floating-pill', { 'focus-active': connected })}>
         <button
-          className={cn('icon-button focus-mode', { active: voiceFocus })}
-          onClick={() => setVoiceFocus(!voiceFocus)}
-          aria-label={voiceFocus ? "Disable Voice Focus" : "Enable Voice Focus (Neural Sensitivity)"}
-          title={voiceFocus ? "Neural Sensitivity Active" : "Heighten Sensitivity"}
+          className={cn('icon-button', { active: isSidebarOpen })}
+          onClick={toggleSidebar}
+          aria-label="Settings"
         >
-          <span className={cn('material-symbols-outlined', { 'filled': voiceFocus })}>
-            {voiceFocus ? 'track_changes' : 'filter_center_focus'}
-          </span>
+          <span className="material-symbols-outlined">settings</span>
         </button>
 
         <button
