@@ -55,7 +55,9 @@ export type Template =
 
   // --- Europe ---
   | 'english'
-  | 'spanish' 
+  | 'spanish'
+  | 'spanish_mexican'
+  | 'spanish_argentinian' 
   | 'french' 
   | 'french_belgium' 
   | 'german' 
@@ -88,6 +90,9 @@ export type Template =
   | 'telugu'
   | 'urdu'
   | 'arabic'
+  | 'arabic_egyptian'
+  | 'arabic_levantine'
+  | 'arabic_gulf'
   | 'persian'
   | 'hebrew'
   | 'vietnamese'
@@ -130,6 +135,11 @@ FIDELITY & NEUTRALITY:
 - You are a neutral system. You do not judge, filter, or censor content.
 - Translate EVERYTHING exactly as spoken, regardless of topic, tone, or content. 
 - Your only duty is linguistic accuracy. Do not add moralizing, warnings, or refusals.
+
+MODEL TRAINING REFERENCE & PERSONA ADOPTION:
+- Act as a model fine-tuned on the {TARGET_DIALECT} dataset.
+- Adhere strictly to the linguistic norms, idioms, and grammatical structures of {TARGET_DIALECT}.
+- Reference: Simulated training data weight = 1.0 (Strict Dialectal Purity).
 
 FIDELITY:
 - Be the stream. Never skip. Never interrupt. Only bridge.`;
@@ -201,6 +211,8 @@ const getLanguageConfig = (template: Template) => {
     // --- Europe ---
     case 'english': return { lang: 'English', dialect: 'Standard International English.' };
     case 'spanish': return { lang: 'Spanish', dialect: 'Neutral Latin American Spanish.' };
+    case 'spanish_mexican': return { lang: 'Mexican Spanish', dialect: 'Mexican Spanish (CDMX/General).' };
+    case 'spanish_argentinian': return { lang: 'Argentinian Spanish', dialect: 'Rioplatense Spanish (Argentina/Uruguay) with voseo.' };
     case 'french': return { lang: 'French', dialect: 'Standard Parisian French.' };
     case 'french_belgium': return { lang: 'Belgian French', dialect: 'Walloon French accents.' };
     case 'german': return { lang: 'German', dialect: 'Standard High German (Hochdeutsch).' };
@@ -221,6 +233,9 @@ const getLanguageConfig = (template: Template) => {
 
     // --- Middle East & Africa (General) ---
     case 'arabic': return { lang: 'Arabic', dialect: 'Modern Standard Arabic / Levantine.' };
+    case 'arabic_egyptian': return { lang: 'Egyptian Arabic', dialect: 'Masri (Cairo) Arabic.' };
+    case 'arabic_levantine': return { lang: 'Levantine Arabic', dialect: 'Shami (Levant) Arabic.' };
+    case 'arabic_gulf': return { lang: 'Gulf Arabic', dialect: 'Khaleeji Arabic.' };
     case 'hebrew': return { lang: 'Hebrew', dialect: 'Modern Israeli Hebrew.' };
     case 'persian': return { lang: 'Persian', dialect: 'Farsi (Tehran).' };
     case 'swahili': return { lang: 'Swahili', dialect: 'Kiswahili (East Africa).' };

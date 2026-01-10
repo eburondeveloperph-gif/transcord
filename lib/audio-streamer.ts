@@ -14,7 +14,6 @@ export class AudioStreamer {
   private audioQueue: Float32Array[] = [];
   private isPlaying: boolean = false;
   private isStreamComplete: boolean = false;
-  private checkInterval: number | null = null;
   private scheduledTime: number = 0;
   
   // REDUCED: Lowered from 0.35s to 0.1s for ultra-low latency playback start.
@@ -23,6 +22,9 @@ export class AudioStreamer {
   public gainNode: GainNode;
   public source: AudioBufferSourceNode;
   private endOfQueueAudioSource: AudioBufferSourceNode | null = null;
+
+  // Worker for background timing to prevent throttling
+  private schedulerWorker: Worker | null = null;
 
   public onComplete = () => {};
   public onPlay = () => {};
@@ -33,6 +35,37 @@ export class AudioStreamer {
     this.source = this.context.createBufferSource();
     this.gainNode.connect(this.context.destination);
     this.addPCM16 = this.addPCM16.bind(this);
+    this.initSchedulerWorker();
+  }
+
+  private initSchedulerWorker() {
+    const blob = new Blob([`
+      let timeoutId;
+      let intervalId;
+      self.onmessage = function(e) {
+        if (e.data.type === 'schedule') {
+          timeoutId = setTimeout(() => {
+            self.postMessage({ type: 'tick' });
+          }, e.data.delay);
+        } else if (e.data.type === 'start_interval') {
+          if (intervalId) clearInterval(intervalId);
+          intervalId = setInterval(() => {
+            self.postMessage({ type: 'tick' });
+          }, e.data.delay);
+        } else if (e.data.type === 'stop') {
+          clearTimeout(timeoutId);
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+      };
+    `], { type: 'application/javascript' });
+    
+    this.schedulerWorker = new Worker(URL.createObjectURL(blob));
+    this.schedulerWorker.onmessage = (e) => {
+      if (e.data.type === 'tick') {
+        this.scheduleNextBuffer();
+      }
+    };
   }
 
   async addWorklet<T extends (d: any) => void>(
@@ -132,22 +165,21 @@ export class AudioStreamer {
       this.scheduledTime = startTime + audioBuffer.duration;
     }
 
+    // Use Worker for timing instead of window.setTimeout/setInterval
     if (this.audioQueue.length === 0) {
       if (this.isStreamComplete) {
         this.isPlaying = false;
         this.onStop();
-        if (this.checkInterval) {
-          clearInterval(this.checkInterval);
-          this.checkInterval = null;
-        }
-      } else if (!this.checkInterval) {
-        this.checkInterval = window.setInterval(() => {
-          if (this.audioQueue.length > 0) this.scheduleNextBuffer();
-        }, 30) as any;
+        this.schedulerWorker?.postMessage({ type: 'stop' });
+      } else {
+        // Start polling interval via worker
+        this.schedulerWorker?.postMessage({ type: 'start_interval', delay: 30 });
       }
     } else {
       const nextCheckTime = (this.scheduledTime - this.context.currentTime) * 1000;
-      setTimeout(() => this.scheduleNextBuffer(), Math.max(0, nextCheckTime - 100));
+      // Schedule single timeout via worker
+      this.schedulerWorker?.postMessage({ type: 'stop' }); // clear previous interval if any
+      this.schedulerWorker?.postMessage({ type: 'schedule', delay: Math.max(0, nextCheckTime - 100) });
     }
   }
 
@@ -157,10 +189,10 @@ export class AudioStreamer {
     this.isStreamComplete = true;
     this.audioQueue = [];
     this.scheduledTime = this.context.currentTime;
-    if (this.checkInterval) {
-      clearInterval(this.checkInterval);
-      this.checkInterval = null;
-    }
+    
+    // Stop worker timers
+    this.schedulerWorker?.postMessage({ type: 'stop' });
+
     this.gainNode.gain.linearRampToValueAtTime(0, this.context.currentTime + 0.1);
     setTimeout(() => {
       this.gainNode.disconnect();
