@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -369,7 +370,8 @@ export default function StreamingConsole() {
       if (!text) return;
 
       const turns = useLogStore.getState().turns;
-      const last = turns.at(-1);
+      // Fixed: Replace turns.at(-1) with turns[turns.length - 1] for better compatibility.
+      const last = turns[turns.length - 1];
 
       // In Transcribe mode, the agent's content IS the transcription.
       if (last?.role === 'agent' && !last.isFinal) {
@@ -380,7 +382,9 @@ export default function StreamingConsole() {
     };
 
     const handleTurnComplete = () => {
-      const last = useLogStore.getState().turns.at(-1);
+      const turns = useLogStore.getState().turns;
+      // Fixed: Replace turns.at(-1) with turns[turns.length - 1] for better compatibility.
+      const last = turns[turns.length - 1];
       if (last && last.role === 'agent') {
         if (currentAudioChunks.current.length > 0) {
           const totalLength = currentAudioChunks.current.reduce((acc, curr) => acc + curr.length, 0);

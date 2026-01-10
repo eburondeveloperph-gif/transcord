@@ -20,7 +20,7 @@ const API_KEY = process.env.API_KEY;
  */
 function ConfigSynchronizer() {
   const { setConfig } = useLiveAPIContext();
-  const { voice, mode, voiceFocus } = useSettings();
+  const { voice, mode, voiceFocus, classId, code } = useSettings();
   const { template, tools } = useTools();
 
   useEffect(() => {
@@ -44,12 +44,12 @@ function ConfigSynchronizer() {
       inputAudioTranscription: {},
       outputAudioTranscription: {},
       // Use string for systemInstruction as per Live API examples to avoid validation errors
-      systemInstruction: generatePrompt(template, voiceFocus, mode),
+      systemInstruction: generatePrompt(template, voiceFocus, mode, classId, code),
       tools: declarations.length > 0 ? [{ functionDeclarations: declarations }] : undefined,
     };
 
     setConfig(config);
-  }, [setConfig, tools, voice, template, voiceFocus, mode]);
+  }, [setConfig, tools, voice, template, voiceFocus, mode, classId, code]);
 
   return null;
 }
@@ -120,8 +120,16 @@ function ApiKeySelector({ onKeySelected }: { onKeySelected: () => void }) {
  */
 function App() {
   const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const { setClassId, setCode } = useSettings();
 
   useEffect(() => {
+    // Parse invite link parameters
+    const params = new URLSearchParams(window.location.search);
+    const cid = params.get('classId');
+    const c = params.get('code');
+    if (cid) setClassId(cid);
+    if (c) setCode(c);
+
     const checkKey = async () => {
       if ((window as any).aistudio && typeof (window as any).aistudio.hasSelectedApiKey === 'function') {
         const selected = await (window as any).aistudio.hasSelectedApiKey();
@@ -132,7 +140,7 @@ function App() {
       }
     };
     checkKey();
-  }, []);
+  }, [setClassId, setCode]);
 
   if (hasKey === null) return null;
 

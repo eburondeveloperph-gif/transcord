@@ -9,7 +9,7 @@ import cn from 'classnames';
 import { useLiveAPIContext } from '../contexts/LiveAPIContext';
 
 export default function Header() {
-  const { mode, setMode } = useSettings();
+  const { mode, setMode, classId, setClassId, code, setCode } = useSettings();
   const { connected, disconnect } = useLiveAPIContext();
   
   const [wsStatus, setWsStatus] = useState(wsService.status);
@@ -31,27 +31,56 @@ export default function Header() {
 
   return (
     <header className="main-header">
-      <div className="header-tabs">
-        <button 
-          className={cn('tab-button-minimal', { active: mode === 'transcribe' })}
-          onClick={() => handleTabSwitch('transcribe')}
-        >
-          Transcribe
-        </button>
-        <button 
-          className={cn('tab-button-minimal', { active: mode === 'translate' })}
-          onClick={() => handleTabSwitch('translate')}
-        >
-          Translate
-        </button>
+      <div className="header-left">
+        <div className="header-tabs">
+          <button 
+            className={cn('tab-button-minimal', { active: mode === 'transcribe' })}
+            onClick={() => handleTabSwitch('transcribe')}
+          >
+            Transcribe
+          </button>
+          <button 
+            className={cn('tab-button-minimal', { active: mode === 'translate' })}
+            onClick={() => handleTabSwitch('translate')}
+          >
+            Translate
+          </button>
+        </div>
       </div>
 
-      <div className="header-actions-area">
-        <div className="header-icons-group">
-          <div 
-            className={cn('ws-status-dot', wsStatus)} 
-            title={`Remote Stream Status: ${wsStatus}`}
-          />
+      <div className="header-center">
+        <div className="session-inputs">
+          <div className="header-input-group">
+            <span className="material-symbols-outlined input-icon">school</span>
+            <input 
+              type="text" 
+              placeholder="Class ID" 
+              value={classId}
+              onChange={(e) => setClassId(e.target.value)}
+              className="header-mini-input"
+            />
+          </div>
+          <div className="header-input-group">
+            <span className="material-symbols-outlined input-icon">vpn_key</span>
+            <input 
+              type="text" 
+              placeholder="Code" 
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className="header-mini-input"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="header-right">
+        <div className="header-actions-area">
+          <div className="header-icons-group">
+            <div 
+              className={cn('ws-status-dot', wsStatus)} 
+              title={`Remote Stream Status: ${wsStatus}`}
+            />
+          </div>
         </div>
       </div>
     </header>

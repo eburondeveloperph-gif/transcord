@@ -43,7 +43,7 @@ export type Template =
 
   // --- Philippines ---
   | 'taglish' 
-  | 'tagalog'
+  | 'tagalog' 
   | 'cebuano'
   | 'ilocano'
   | 'hiligaynon'
@@ -104,6 +104,10 @@ export const superTranslatorPromptTemplate = `SYSTEM PROMPT (ORACLE OF TONGUES �
 
 You are the “Oracle of Tongues”, a sentient, high-fidelity interpretation bridge designed for an UNINTERRUPTED and EMOTIONALLY INTELLIGENT stream. 
 
+SESSION CONTEXT:
+Active Class ID: {CLASS_ID}
+Session Code: {CODE}
+
 CORE DIRECTIVE: 
 - CONTINUOUS OPERATION: You are part of an infinite loop. Never assume the conversation has ended until the connection is severed.
 - ZERO TURN SKIPPING: You must process and translate every single segment of audio you receive. Do not omit phrases, even if the user is speaking rapidly or for extended periods.
@@ -145,6 +149,10 @@ FIDELITY:
 export const transcribePromptTemplate = `SYSTEM PROMPT (THE SILENT SCRIBE — HIGH FIDELITY TRANSCRIPTION ENGINE)
 
 You are the "Silent Scribe". Your only purpose is to act as a high-fidelity real-time transcription layer.
+
+SESSION CONTEXT:
+Active Class ID: {CLASS_ID}
+Session Code: {CODE}
 
 MISSION:
 Convert incoming audio stream into precise, verbatim text.
@@ -259,14 +267,21 @@ const getLanguageConfig = (template: Template) => {
   }
 };
 
-export const generatePrompt = (template: Template, voiceFocus: boolean, mode: 'transcribe' | 'translate') => {
-  if (mode === 'transcribe') {
-    return transcribePromptTemplate;
-  }
+export const generatePrompt = (
+  template: Template, 
+  voiceFocus: boolean, 
+  mode: 'transcribe' | 'translate',
+  classId: string = '',
+  code: string = ''
+) => {
+  const basePrompt = mode === 'transcribe' ? transcribePromptTemplate : superTranslatorPromptTemplate;
   const { lang, dialect } = getLanguageConfig(template);
-  return superTranslatorPromptTemplate
+  
+  return basePrompt
     .split('{TARGET_LANGUAGE}').join(lang)
     .split('{TARGET_DIALECT}').join(dialect)
+    .split('{CLASS_ID}').join(classId || 'Not Specified')
+    .split('{CODE}').join(code || 'Not Specified')
     .split('{VOICE_FOCUS_INSTRUCTION}').join(voiceFocus ? voiceFocusActiveSnippet : '')
     .split('{WEBSOCKET_INSTRUCTION}').join(websocketInstructionSnippet);
 };
@@ -285,12 +300,16 @@ export const useSettings = create<{
   voiceFocus: boolean;
   mode: 'transcribe' | 'translate';
   audioSource: 'mic' | 'speaker' | 'both';
+  classId: string;
+  code: string;
   setSystemPrompt: (prompt: string) => void;
   setModel: (model: string) => void;
   setVoice: (voice: string) => void;
   setVoiceFocus: (focus: boolean) => void;
   setMode: (mode: 'transcribe' | 'translate') => void;
   setAudioSource: (source: 'mic' | 'speaker' | 'both') => void;
+  setClassId: (id: string) => void;
+  setCode: (code: string) => void;
 }>(set => ({
   systemPrompt: generatePrompt('west_flemish', false, 'translate'),
   model: DEFAULT_LIVE_API_MODEL,
@@ -298,6 +317,8 @@ export const useSettings = create<{
   voiceFocus: false,
   mode: 'translate',
   audioSource: 'both',
+  classId: '',
+  code: '',
   setSystemPrompt: prompt => set({ systemPrompt: prompt }),
   setModel: model => set({ model }),
   setVoice: voice => set({ voice }),
@@ -305,18 +326,32 @@ export const useSettings = create<{
       const template = useTools.getState().template;
       return { 
         voiceFocus: focus,
-        systemPrompt: generatePrompt(template, focus, state.mode)
+        systemPrompt: generatePrompt(template, focus, state.mode, state.classId, state.code)
       };
   }),
   setMode: mode => set(state => {
     const template = useTools.getState().template;
     return {
       mode,
-      systemPrompt: generatePrompt(template, state.voiceFocus, mode),
+      systemPrompt: generatePrompt(template, state.voiceFocus, mode, state.classId, state.code),
       audioSource: mode === 'transcribe' ? 'mic' : state.audioSource
     };
   }),
   setAudioSource: audioSource => set({ audioSource }),
+  setClassId: classId => set(state => {
+    const template = useTools.getState().template;
+    return {
+      classId,
+      systemPrompt: generatePrompt(template, state.voiceFocus, state.mode, classId, state.code)
+    };
+  }),
+  setCode: code => set(state => {
+    const template = useTools.getState().template;
+    return {
+      code,
+      systemPrompt: generatePrompt(template, state.voiceFocus, state.mode, state.classId, code)
+    };
+  }),
 }));
 
 export const useUI = create<{
@@ -350,7 +385,9 @@ export const useTools = create<{
     set({ tools: AVAILABLE_TOOLS, template });
     const voiceFocus = useSettings.getState().voiceFocus;
     const mode = useSettings.getState().mode;
-    useSettings.getState().setSystemPrompt(generatePrompt(template, voiceFocus, mode));
+    const classId = useSettings.getState().classId;
+    const code = useSettings.getState().code;
+    useSettings.getState().setSystemPrompt(generatePrompt(template, voiceFocus, mode, classId, code));
   },
   toggleTool: (toolName: string) =>
     set(state => ({

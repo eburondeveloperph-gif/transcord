@@ -69,13 +69,74 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--safe-top) calc(20px + var(--safe-right)) 0 calc(20px + var(--safe-left));
+  padding: var(--safe-top) 20px 0 20px;
   background: var(--glass-heavy);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border-bottom: 1px solid var(--border);
   z-index: 500;
   flex-shrink: 0;
+  gap: 16px;
+}
+
+.header-left, .header-right {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.header-right {
+  justify-content: flex-end;
+}
+
+.header-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex: 2;
+}
+
+.session-inputs {
+  display: flex;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  transition: all 0.3s ease;
+}
+
+.session-inputs:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent-dim);
+}
+
+.header-input-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.input-icon {
+  font-size: 16px;
+  color: var(--accent);
+  opacity: 0.7;
+}
+
+.header-mini-input {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.8rem;
+  width: 80px;
+  outline: none;
+  font-weight: 500;
+}
+
+.header-mini-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.5;
 }
 
 .header-tabs {
@@ -674,8 +735,24 @@ html, body {
 /* Mobile Specific Optimizations */
 @media (max-width: 680px) {
   .main-header {
-    height: calc(56px + var(--safe-top));
-    padding: var(--safe-top) 16px 0 16px;
+    height: auto;
+    flex-direction: column;
+    padding: var(--safe-top) 16px 12px 16px;
+    gap: 12px;
+  }
+
+  .header-left, .header-right {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .header-center {
+    width: 100%;
+  }
+
+  .session-inputs {
+    width: 100%;
+    justify-content: center;
   }
   
   .tab-button-minimal {
@@ -737,7 +814,7 @@ html, body {
 
 /* Landscape orientation mobile fix */
 @media (max-height: 500px) and (orientation: landscape) {
-  .main-header { height: 48px; }
+  .main-header { height: auto; }
   .control-tray-floating { bottom: 8px; }
   .floating-pill { max-width: 90%; }
   .transcription-view, .transcribe-view { padding-bottom: 64px; }
