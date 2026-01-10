@@ -55,16 +55,15 @@ export class AudioRecorder {
   private currentGain: number = 1.0;
   private targetGain: number = 1.0;
   private noiseFloor: number = 0.01;
-  private volumeMultiplier: number = 1.0; // External control for ducking (1.0 = normal, 0.15 = ducked)
+  
+  // Ducking Logic Variables
+  private volumeMultiplier: number = 1.0; // Current smoothed multiplier
+  private targetVolumeMultiplier: number = 1.0; // Target multiplier
 
   constructor(public sampleRate = 16000) {}
 
   public setVolumeMultiplier(multiplier: number) {
-    this.volumeMultiplier = multiplier;
-    // Force immediate update if recording
-    if (this.recordingWorklet) {
-       this.recordingWorklet.port.postMessage({ gain: this.currentGain * this.volumeMultiplier });
-    }
+    this.targetVolumeMultiplier = multiplier;
   }
 
   private updateSensitivity(volume: number) {
@@ -99,7 +98,12 @@ export class AudioRecorder {
     const alpha = this.targetGain > this.currentGain ? 0.2 : 0.05;
     this.currentGain = this.currentGain * (1 - alpha) + this.targetGain * alpha;
     
-    // Apply external ducking multiplier (e.g. 0.15 when AI is speaking)
+    // Smoothly transition volume multiplier for ducking
+    // Alpha of 0.15 gives a nice fade over ~200-300ms
+    const duckingAlpha = 0.15;
+    this.volumeMultiplier = this.volumeMultiplier * (1 - duckingAlpha) + this.targetVolumeMultiplier * duckingAlpha;
+
+    // Apply combined gain
     const finalGain = this.currentGain * this.volumeMultiplier;
 
     // Send updated gain to worklet
@@ -178,6 +182,7 @@ export class AudioRecorder {
       this.currentGain = 1.0;
       this.targetGain = 1.0;
       this.volumeMultiplier = 1.0;
+      this.targetVolumeMultiplier = 1.0;
     };
     if (this.starting) {
       this.starting.then(handleStop).catch(handleStop);

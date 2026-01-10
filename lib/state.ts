@@ -9,7 +9,7 @@ export type Template =
   // --- Dutch & Benelux Dialects ---
   | 'dutch' 
   | 'dutch_flemish' 
-  | 'dutch_brabantian'
+  | 'dutch_brabantian' 
   | 'dutch_limburgish'
   | 'west_flemish'
   | 'dutch_surinamese'
@@ -277,7 +277,7 @@ export const useSettings = create<{
   setVoice: (voice: string) => void;
   setVoiceFocus: (focus: boolean) => void;
 }>(set => ({
-  systemPrompt: generatePrompt('dutch', false), // Default to Dutch as per focus
+  systemPrompt: generatePrompt('west_flemish', false), // Default to West Flemish as per request
   model: DEFAULT_LIVE_API_MODEL,
   voice: DEFAULT_VOICE,
   voiceFocus: false,
@@ -319,7 +319,7 @@ export const useTools = create<{
   updateTool: (oldName: string, updatedTool: FunctionCall) => void;
 }>(set => ({
   tools: [],
-  template: 'dutch', // Default to Dutch
+  template: 'west_flemish', // Default to West Flemish
   setTemplate: (template: Template) => {
     set({ tools: [], template });
     const voiceFocus = useSettings.getState().voiceFocus;

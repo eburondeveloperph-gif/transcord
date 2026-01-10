@@ -25,12 +25,13 @@ function ControlTray() {
   }, [connected]);
 
   // Handle Ducking: reduce mic input level to 15% when AI is speaking
+  // Added connected and muted dependencies to ensure state is re-applied on restart
   useEffect(() => {
-    if (audioRecorder) {
+    if (audioRecorder && connected && !muted) {
       // If AI is speaking, duck to 15%, otherwise full 100%
       audioRecorder.setVolumeMultiplier(isAiSpeaking ? 0.15 : 1.0);
     }
-  }, [isAiSpeaking, audioRecorder]);
+  }, [isAiSpeaking, audioRecorder, connected, muted]);
 
   useEffect(() => {
     const onData = (base64: string) => {
