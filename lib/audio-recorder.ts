@@ -50,8 +50,45 @@ export class AudioRecorder {
   vuWorklet: AudioWorkletNode | undefined;
 
   private starting: Promise<void> | null = null;
+  
+  // Sensitivity Logic Variables
+  private currentGain: number = 1.0;
+  private targetGain: number = 1.0;
+  private noiseFloor: number = 0.01;
+  private sensitivityInterval: number | null = null;
 
   constructor(public sampleRate = 16000) {}
+
+  private updateSensitivity(volume: number) {
+    // Volume is RMS from the VU meter
+    // If volume is extremely low, it might be ambient noise
+    if (volume < this.noiseFloor) {
+      this.noiseFloor = this.noiseFloor * 0.95 + volume * 0.05; // Slowly track noise floor
+    }
+
+    // Heuristic: target a comfortable peak around 0.5-0.7 RMS for the model
+    const TARGET_LEVEL = 0.4;
+    const MIN_GAIN = 0.5;
+    const MAX_GAIN = 4.0;
+
+    if (volume > 0.005) { // Active signal detection
+      const adjustmentFactor = TARGET_LEVEL / (volume + 0.001);
+      this.targetGain = Math.max(MIN_GAIN, Math.min(MAX_GAIN, adjustmentFactor));
+    } else {
+      // Quiet room: slightly increase sensitivity if background is very low
+      if (this.noiseFloor < 0.01) {
+        this.targetGain = Math.min(MAX_GAIN, this.targetGain * 1.01);
+      }
+    }
+
+    // Smoothly transition current gain to target gain
+    this.currentGain = this.currentGain * 0.9 + this.targetGain * 0.1;
+    
+    // Send updated gain to worklet
+    if (this.recordingWorklet) {
+      this.recordingWorklet.port.postMessage({ gain: this.currentGain });
+    }
+  }
 
   async start() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -60,13 +97,11 @@ export class AudioRecorder {
 
     this.starting = new Promise(async (resolve, reject) => {
       try {
-        // CRITICAL: Explicitly enable echo cancellation and noise suppression
-        // to prevent the "auto-mute" feedback loop mentioned by the user.
         this.stream = await navigator.mediaDevices.getUserMedia({ 
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
-            autoGainControl: true,
+            autoGainControl: true, // Native AGC
             channelCount: 1,
             sampleRate: this.sampleRate
           } 
@@ -99,7 +134,9 @@ export class AudioRecorder {
         );
         this.vuWorklet = new AudioWorkletNode(this.audioContext, vuWorkletName);
         this.vuWorklet.port.onmessage = (ev: MessageEvent) => {
-          this.emitter.emit('volume', ev.data.volume);
+          const volume = ev.data.volume;
+          this.emitter.emit('volume', volume);
+          this.updateSensitivity(volume);
         };
 
         this.source.connect(this.vuWorklet);
@@ -120,6 +157,8 @@ export class AudioRecorder {
       this.recordingWorklet = undefined;
       this.vuWorklet = undefined;
       this.recording = false;
+      this.currentGain = 1.0;
+      this.targetGain = 1.0;
     };
     if (this.starting) {
       this.starting.then(handleStop).catch(handleStop);

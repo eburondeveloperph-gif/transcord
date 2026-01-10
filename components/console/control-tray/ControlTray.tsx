@@ -9,18 +9,22 @@ import { AudioRecorder } from '../../../lib/audio-recorder';
 import { useLogStore, useUI, useSettings } from '../../../lib/state';
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
 import { wsService } from '../../../lib/websocket-service';
+import { playBeep } from '../../../lib/utils';
+
+const MAX_TURN_SECONDS = 30;
 
 function ControlTray() {
   const [audioRecorder] = useState(() => new AudioRecorder());
   const [muted, setMuted] = useState(false);
   const [textInput, setTextInput] = useState('');
   const [wsStatus, setWsStatus] = useState(wsService.status);
+  const [turnElapsed, setTurnElapsed] = useState(0);
   const connectButtonRef = useRef<HTMLButtonElement>(null);
+  const beepedRef = useRef<Set<number>>(new Set());
 
   const { client, connected, connect, disconnect } = useLiveAPIContext();
   const { toggleSidebar } = useUI();
   const { voiceFocus, setVoiceFocus } = useSettings();
-  const clearTurns = useLogStore(state => state.clearTurns);
 
   useEffect(() => {
     wsService.on('status', setWsStatus);
@@ -30,8 +34,58 @@ function ControlTray() {
   useEffect(() => {
     if (!connected) {
       setMuted(false);
+      setTurnElapsed(0);
+      beepedRef.current.clear();
     }
   }, [connected]);
+
+  // Turn Timer Logic
+  useEffect(() => {
+    let interval: number;
+    const isRecording = connected && !muted;
+
+    if (isRecording) {
+      const startTime = Date.now();
+      interval = window.setInterval(() => {
+        const elapsed = (Date.now() - startTime) / 1000;
+        setTurnElapsed(elapsed);
+
+        // Audible countdown at 27, 28, 29 seconds
+        const floorElapsed = Math.floor(elapsed);
+        if ([27, 28, 29].includes(floorElapsed) && !beepedRef.current.has(floorElapsed)) {
+          playBeep(floorElapsed === 29 ? 1320 : 880); // Higher pitch for the last bip
+          beepedRef.current.add(floorElapsed);
+        }
+
+        // Auto-Finalize at 30 seconds
+        if (elapsed >= MAX_TURN_SECONDS) {
+          setMuted(true);
+          playBeep(440, 0.3); // Low bip to signify forced stop
+          clearInterval(interval);
+        }
+      }, 100);
+    } else {
+      setTurnElapsed(0);
+      beepedRef.current.clear();
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [connected, muted]);
+
+  // Reset timer on model response completion
+  useEffect(() => {
+    const onTurnComplete = () => {
+      // If we were muted because of the timer, we might want to stay muted 
+      // or auto-unmute. For now, we just reset the local tracking.
+      beepedRef.current.clear();
+    };
+    client.on('turncomplete', onTurnComplete);
+    return () => {
+      client.off('turncomplete', onTurnComplete);
+    };
+  }, [client]);
 
   useEffect(() => {
     const onData = (base64: string) => {
@@ -75,9 +129,22 @@ function ControlTray() {
     }
   };
 
+  const progressPercent = Math.min(100, (turnElapsed / MAX_TURN_SECONDS) * 100);
+
   return (
     <section className="control-tray-floating">
       <div className={cn('floating-pill', { 'focus-active': voiceFocus && connected })}>
+        
+        {/* Turn Timer Progress Bar (Hidden when not recording) */}
+        {connected && !muted && (
+          <div className="turn-timer-bar">
+            <div 
+              className="turn-timer-progress" 
+              style={{ width: `${progressPercent}%`, backgroundColor: progressPercent > 80 ? 'var(--danger)' : 'var(--accent)' }}
+            />
+          </div>
+        )}
+
         <button
           className="icon-button"
           onClick={toggleSidebar}

@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -18,9 +19,9 @@ const LANGUAGE_LABELS: Record<Template, string> = {
   'spanish': 'Spanish',
   'french': 'French',
   'french_ivory_coast': 'Ivorian French',
-  'french_belgium': 'Belgian French',
+  'french_belgium': 'French Belgium',
   'medumba': 'Cameroon Medumba',
-  'dutch_flemish': 'Belgian Flemish',
+  'dutch_flemish': 'Dutch Flemish',
   'japanese': 'Japanese',
   'korean': 'Korean',
   'mandarin': 'Mandarin',
@@ -29,7 +30,16 @@ const LANGUAGE_LABELS: Record<Template, string> = {
   'portuguese': 'Portuguese',
   'russian': 'Russian',
   'hindi': 'Hindi',
-  'arabic': 'Arabic'
+  'arabic': 'Arabic',
+  'turkish': 'Turkish',
+  'vietnamese': 'Vietnamese',
+  'polish': 'Polish',
+  'thai': 'Thai',
+  'bengali': 'Bengali',
+  'dutch': 'Dutch (Netherlands)',
+  'swedish': 'Swedish',
+  'norwegian': 'Norwegian',
+  'danish': 'Danish'
 };
 
 /**

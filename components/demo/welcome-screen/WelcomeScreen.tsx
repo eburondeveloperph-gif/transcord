@@ -22,19 +22,19 @@ const welcomeContent: Record<Template, { label: string; title: string; descripti
     prompts: ["C'est comment ?", "On est ensemble.", "Ça va aller."],
   },
   'french_belgium': {
-    label: 'Belgian French',
+    label: 'French Belgium',
     title: 'Super Traducteur',
     description: 'Traduction naturelle en français de Belgique.',
     prompts: ["Il est nonante heures.", "C'est une belle drache.", "On va manger une frite ?"],
   },
   'medumba': {
-    label: 'Medumba',
+    label: 'Cameroon Medumba',
     title: 'Super Translator',
     description: 'Real-time translation into the Medumba language (Cameroon).',
     prompts: ["How are you?", "What is your name?", "Thank you very much."],
   },
   'dutch_flemish': {
-    label: 'Belgian Flemish',
+    label: 'Dutch Flemish',
     title: 'Super Vertaler',
     description: 'Natuurlijke vertaling in het Vlaams.',
     prompts: ["Hoe gaat het met u?", "Dank u wel.", "Heel erg bedankt."],
@@ -85,7 +85,7 @@ const welcomeContent: Record<Template, { label: string; title: string; descripti
     label: 'Portuguese',
     title: 'Super Tradutor',
     description: 'Tradução natural para português.',
-    prompts: ["Como você está hoje?", "Pode me ajudar com isso?", "A reunião foi produtiva."],
+    prompts: ["Como você está hoje?", "Pode me ajudar with this?", "A reunião foi produtiva."],
   },
   'russian': {
     label: 'Russian',
@@ -104,6 +104,60 @@ const welcomeContent: Record<Template, { label: string; title: string; descripti
     title: 'المترجم الخارق',
     description: 'ترجمة فورية وطبيعية إلى اللغة العربية.',
     prompts: ["كيف حالك اليوم؟", "هل يمكنك مساعدتي؟", "كان الاجتماع مثمرًا للغاية."],
+  },
+  'turkish': {
+    label: 'Turkish',
+    title: 'Super Çevirmen',
+    description: 'Hızlı ve doğal Türkçe çeviri.',
+    prompts: ["Bugün nasılsın?", "Bana yardım eder misin?", "Toplantı verimli geçti."],
+  },
+  'vietnamese': {
+    label: 'Vietnamese',
+    title: 'Siêu Phiên Dịch',
+    description: 'Dịch thuật tiếng Việt tự nhiên và nhanh chóng.',
+    prompts: ["Hôm nay bạn thế nào?", "Giúp tôi được không?", "Cuộc họp rất hiệu quả."],
+  },
+  'polish': {
+    label: 'Polish',
+    title: 'Super Tłumacz',
+    description: 'Szybkie i naturalne tłumaczenie na polski.',
+    prompts: ["Jak się dziś masz?", "Pomożesz mi?", "Spotkanie było owocne."],
+  },
+  'thai': {
+    label: 'Thai',
+    title: 'สุดยอดนักแปล',
+    description: 'แปลภาษาไทยแบบเรียลไทม์ที่รวดเร็วและแม่นยำ',
+    prompts: ["วันนี้เป็นอย่างไรบ้าง?", "ช่วยฉันหน่อยได้ไหม?", "การประชุมมีประสิทธิภาพมาก"],
+  },
+  'bengali': {
+    label: 'Bengali',
+    title: 'সুপার অনুবাদক',
+    description: 'দ্রুত এবং স্বাভাবিক বাংলা অনুবাদ।',
+    prompts: ["আজ আপনি কেমন আছেন?", "আপনি কি আমাকে সাহায্য করতে পারেন?", "মিটিংটি খুব ফলপ্রসূ ছিল।"],
+  },
+  'dutch': {
+    label: 'Dutch (Netherlands)',
+    title: 'Super Vertaler',
+    description: 'Snelle en natuurlijke vertaling naar het Nederlands.',
+    prompts: ["Hoe gaat het vandaag?", "Kun je me helpen?", "De vergadering was productief."],
+  },
+  'swedish': {
+    label: 'Swedish',
+    title: 'Superöversättare',
+    description: 'Snabb och naturlig översättning till svenska.',
+    prompts: ["Hur mår du idag?", "Kan du hjälpa mig?", "Mötet var produktivt."],
+  },
+  'norwegian': {
+    label: 'Norwegian',
+    title: 'Superoversetter',
+    description: 'Rask og naturlig oversettelse til norsk.',
+    prompts: ["Hvordan har du det i dag?", "Kan du hjelpe meg?", "Møtet var produktivt."],
+  },
+  'danish': {
+    label: 'Danish',
+    title: 'Superoversætter',
+    description: 'Hurtig og naturlig oversættelse til dansk.',
+    prompts: ["Hvordan har du det i dag?", "Kan du hjælpe mig?", "Mødet var produktivt."],
   }
 };
 
@@ -122,9 +176,9 @@ const WelcomeScreen: React.FC = () => {
               onChange={(e) => setTemplate(e.target.value as Template)} 
               aria-label="Select Target Language"
             >
-              {(Object.keys(welcomeContent) as Template[]).map((key) => (
+              {(Object.keys(welcomeContent) as Template[]).sort().map((key) => (
                 <option key={key} value={key}>
-                  {welcomeContent[key].label} Mode
+                  {welcomeContent[key as Template].label} Mode
                 </option>
               ))}
             </select>

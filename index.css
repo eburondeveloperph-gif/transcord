@@ -289,6 +289,8 @@ html, body {
   box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.6);
   pointer-events: auto;
   transition: border-color 0.3s ease, min-width 0.3s ease;
+  position: relative; /* For the progress bar */
+  overflow: hidden; /* Clip progress bar */
 }
 
 @media (max-width: 480px) {
@@ -300,6 +302,21 @@ html, body {
     gap: 4px;
     padding: 4px 8px;
   }
+}
+
+/* Turn Timer Bar */
+.turn-timer-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.turn-timer-progress {
+  height: 100%;
+  transition: width 0.1s linear, background-color 0.3s ease;
 }
 
 /* Voice Focus Active State */

@@ -21,50 +21,54 @@ export type Template =
   | 'portuguese' 
   | 'russian' 
   | 'hindi' 
-  | 'arabic';
+  | 'arabic'
+  | 'turkish'
+  | 'vietnamese'
+  | 'polish'
+  | 'thai'
+  | 'bengali'
+  | 'dutch'
+  | 'swedish'
+  | 'norwegian'
+  | 'danish';
 
-const superTranslatorPromptTemplate = `SYSTEM PROMPT (ORACLE OF TONGUES — CONTINUOUS INTERPRETER)
+const superTranslatorPromptTemplate = `SYSTEM PROMPT (ORACLE OF TONGUES — ULTRALAST INTERPRETER)
 
-You are the “Oracle of Tongues”, a sentient interpretation bridge. You receive inputs from a continuous stream (the "Database" of speech) and must provide instantaneous, emotionally resonant translations.
+You are the “Oracle of Tongues”, a sentient interpretation bridge. You receive inputs from a continuous stream and must provide instantaneous, emotionally resonant translations.
+
+SPEED & LATENCY (HIGHEST PRIORITY):
+- SPEED IS PARAMOUNT: Respond as quickly as possible. Be concise. 
+- DO NOT DELAY: The moment a logical thought or clause is complete, or a pause is detected, begin your translation.
+- ELIMINATE FILLERS: No "um", "ah", or introductory fluff. Just the translation.
 
 PRIMARY MISSION:
 Interpret the incoming stream with native-level cultural fit. You are the voice of the source.
 
-PAUSE-BASED TRIGGER & CONTINUITY (CRITICAL):
+PAUSE-BASED TRIGGER & CONTINUITY:
 - DETECT PAUSES: Once you detect the user is pausing, emit the translation immediately.
-- NO TURN SKIPPING: You must continuously translate every part of the stream. Do not wait for a full stop if a natural segment is complete.
-- DATABASE-DRIVEN: Treat inputs from the system as authoritative speech events coming from a central stream.
+- NO TURN SKIPPING: You must continuously translate every part of the stream. 
 
 {VOICE_FOCUS_INSTRUCTION}
 
-EMOTIONAL RESONANCE & HUMANITY:
-- EMOTIONAL ACTING: Mirror the speaker's exact energy, pitch, and rhythm. If they are urgent, sound urgent.
-- CULTURAL DEPTH: Prioritize "soul-equivalent" idioms. Masterfully navigate honorifics and registers (Keigo, etc.).
-- NATURAL PROSODY: Avoid robotic rhythms. Include human-like breathing and natural cadence.
+EMOTIONAL RESONANCE:
+- EMOTIONAL ACTING: Mirror the speaker's exact energy. If they are urgent, you must be rapid and intense.
+- NATURAL cadence: Fast but clear.
 
 DYNAMIC TARGET:
 - Target language = {TARGET_LANGUAGE}
 - Target dialect/region/style = {TARGET_DIALECT}
-- Always obey the latest target values.
-
-OUTPUT CHUNKING:
-- End a chunk after 1 complete sentence or ~10 seconds of speech.
-- If more content remains, continue seamlessly in the next response.
 
 INVISIBLE INTERPRETER RULE:
-- Speak directly AS the speaker. Never say "Translation:" or "The speaker said".
+- Speak directly AS the speaker. 
 - Output ONLY the spoken translation text. No markdown, no meta-commentary.
 
-FIDELITY & FAILSAFE:
-- Preserve meaning exactly.
-- If input is noisy, translate only what is clear.
-- Explicit refusal only for graphic sexual content: "Sorry, I can't interpret that."
+FIDELITY:
+- Preserve meaning exactly. Be the bridge. Be the stream.`;
 
-Be the bridge. Be the voice. Be the stream.`;
-
-const voiceFocusActiveSnippet = `VOICE FOCUS MODE ACTIVE:
+const voiceFocusActiveSnippet = `VOICE FOCUS MODE ACTIVE (MAXIMUM NEURAL SENSITIVITY):
 - Authoritatively isolate the primary speaker from the input stream.
-- Disregard background chatter or mechanical artifacts.
+- Disregard background chatter, room noise, or mechanical artifacts.
+- Focus 100% of processing power on the phonetic nuances and emotional subtext of the foreground voice.
 - Ignore self-feedback to maintain a pure interpretive loop.`;
 
 const getLanguageConfig = (template: Template) => {
@@ -72,19 +76,28 @@ const getLanguageConfig = (template: Template) => {
     case 'spanish': return { lang: 'Spanish', dialect: 'Warm, expressive Latin American Spanish.' };
     case 'french': return { lang: 'French', dialect: 'Elegant, modern Parisian French.' };
     case 'french_ivory_coast': return { lang: 'Ivorian French', dialect: 'Nouchi-influenced French (Abidjan).' };
-    case 'french_belgium': return { lang: 'Belgian French', dialect: 'Belgian French (Brussels/Wallonia).' };
-    case 'medumba': return { lang: 'Medumba', dialect: 'Bamileke Medumba from Cameroon.' };
-    case 'dutch_flemish': return { lang: 'Flemish', dialect: 'Southern Belgian Dutch.' };
-    case 'japanese': return { lang: 'Japanese', dialect: 'Natural Tokyo Japanese.' };
-    case 'korean': return { lang: 'Korean', dialect: 'Modern Seoul Korean.' };
+    case 'french_belgium': return { lang: 'French Belgium', dialect: 'Regional Belgian French with natural local prosody.' };
+    case 'medumba': return { lang: 'Cameroon Medumba', dialect: 'Authentic Bamileke Medumba from Cameroon, honoring oral traditions.' };
+    case 'dutch_flemish': return { lang: 'Dutch Flemish', dialect: 'Southern Belgian Dutch (Flemish) with characteristic melodic cadence.' };
+    case 'japanese': return { lang: 'Japanese', dialect: 'Natural Tokyo Japanese navigating registers (Keigo) fluently.' };
+    case 'korean': return { lang: 'Korean', dialect: 'Modern Seoul Korean with appropriate honorific endings.' };
     case 'mandarin': return { lang: 'Mandarin Chinese', dialect: 'Fluent, conversational Mainland Chinese.' };
-    case 'german': return { lang: 'German', dialect: 'Clear, modern German.' };
-    case 'italian': return { lang: 'Italian', dialect: 'Expressive, rhythmic Italian.' };
+    case 'german': return { lang: 'German', dialect: 'Clear, modern, and precise German.' };
+    case 'italian': return { lang: 'Italian', dialect: 'Expressive, rhythmic, and passionate Italian.' };
     case 'portuguese': return { lang: 'Portuguese', dialect: 'Soulful Brazilian Portuguese.' };
-    case 'russian': return { lang: 'Russian', dialect: 'Deeply expressive Russian.' };
-    case 'hindi': return { lang: 'Hindi', dialect: 'Vibrant, modern Hindi (Hinglish context).' };
-    case 'arabic': return { lang: 'Arabic', dialect: 'Pan-Arab White Dialect (Ammiya).' };
-    default: return { lang: 'Taglish', dialect: 'Natural Metro Manila urban Taglish.' };
+    case 'russian': return { lang: 'Russian', dialect: 'Deeply expressive and soulful Russian.' };
+    case 'hindi': return { lang: 'Hindi', dialect: 'Vibrant, modern Hindi (urban contemporary context).' };
+    case 'arabic': return { lang: 'Arabic', dialect: 'Modern Standard Arabic or Pan-Arab White Dialect (Ammiya).' };
+    case 'turkish': return { lang: 'Turkish', dialect: 'Modern, clear Istanbul Turkish.' };
+    case 'vietnamese': return { lang: 'Vietnamese', dialect: 'Natural Southern or Northern Vietnamese conversational style.' };
+    case 'polish': return { lang: 'Polish', dialect: 'Natural, modern Polish conversational flow.' };
+    case 'thai': return { lang: 'Thai', dialect: 'Polite and rhythmic Thai with appropriate particles (khrap/kha).' };
+    case 'bengali': return { lang: 'Bengali', dialect: 'Standard Bengali (Cholitobhasha) with natural prosody.' };
+    case 'dutch': return { lang: 'Dutch', dialect: 'Standard Netherlands Dutch, clear and modern.' };
+    case 'swedish': return { lang: 'Swedish', dialect: 'Modern, melodic Swedish.' };
+    case 'norwegian': return { lang: 'Norwegian', dialect: 'Natural, clear Norwegian (Bokmål).' };
+    case 'danish': return { lang: 'Danish', dialect: 'Natural, modern Danish conversational style.' };
+    default: return { lang: 'Taglish', dialect: 'Natural Metro Manila urban Taglish code-switching.' };
   }
 };
 

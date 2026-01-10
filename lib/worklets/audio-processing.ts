@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -21,16 +22,23 @@
 const AudioRecordingWorklet = `
 class AudioProcessingWorklet extends AudioWorkletProcessor {
 
-  // send and clear buffer every 2048 samples, 
-  // which at 16khz is about 8 times a second
-  buffer = new Int16Array(2048);
+  // Reduced buffer to 512 samples (~32ms at 16khz) for faster upstreaming.
+  buffer = new Int16Array(512);
 
   // current write index
   bufferWriteIndex = 0;
+  
+  // Dynamic gain multiplier
+  gain = 1.0;
 
   constructor() {
     super();
     this.hasAudio = false;
+    this.port.onmessage = (event) => {
+      if (event.data.gain !== undefined) {
+        this.gain = event.data.gain;
+      }
+    };
   }
 
   /**
@@ -59,8 +67,15 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
     const l = float32Array.length;
     
     for (let i = 0; i < l; i++) {
+      // Apply dynamic gain
+      let sample = float32Array[i] * this.gain;
+      
+      // Soft clipping / limiting
+      if (sample > 1.0) sample = 1.0;
+      if (sample < -1.0) sample = -1.0;
+
       // convert float32 -1 to 1 to int16 -32768 to 32767
-      const int16Value = float32Array[i] * 32768;
+      const int16Value = sample * 32768;
       this.buffer[this.bufferWriteIndex++] = int16Value;
       if(this.bufferWriteIndex >= this.buffer.length) {
         this.sendAndClearBuffer();

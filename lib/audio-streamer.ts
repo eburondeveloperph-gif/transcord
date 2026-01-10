@@ -17,8 +17,8 @@ export class AudioStreamer {
   private checkInterval: number | null = null;
   private scheduledTime: number = 0;
   
-  // INCREASED: 350ms buffer to handle "far from buffer" conditions or weak signal areas.
-  private initialBufferTime: number = 0.35; 
+  // REDUCED: Lowered from 0.35s to 0.1s for ultra-low latency playback start.
+  private initialBufferTime: number = 0.1; 
   
   public gainNode: GainNode;
   public source: AudioBufferSourceNode;
@@ -94,8 +94,8 @@ export class AudioStreamer {
   }
 
   private scheduleNextBuffer() {
-    // INCREASED: 500ms lookahead for maximum stability during movement.
-    const SCHEDULE_AHEAD_TIME = 0.5;
+    // REDUCED: Lowered from 0.5s to 0.15s to keep the pipe tight.
+    const SCHEDULE_AHEAD_TIME = 0.15;
 
     while (
       this.audioQueue.length > 0 &&
@@ -135,11 +135,11 @@ export class AudioStreamer {
       } else if (!this.checkInterval) {
         this.checkInterval = window.setInterval(() => {
           if (this.audioQueue.length > 0) this.scheduleNextBuffer();
-        }, 50) as any;
+        }, 30) as any;
       }
     } else {
       const nextCheckTime = (this.scheduledTime - this.context.currentTime) * 1000;
-      setTimeout(() => this.scheduleNextBuffer(), Math.max(0, nextCheckTime - 150));
+      setTimeout(() => this.scheduleNextBuffer(), Math.max(0, nextCheckTime - 100));
     }
   }
 
