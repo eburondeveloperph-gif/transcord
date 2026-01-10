@@ -150,7 +150,7 @@ const getVoiceAlias = (voiceId: string) => VOICE_ALIASES[voiceId] || `Persona ${
 
 export default function Sidebar() {
   const { isSidebarOpen, toggleSidebar } = useUI();
-  const { systemPrompt, voice, voiceFocus, mode, setSystemPrompt, setVoice, setVoiceFocus, setMode } = useSettings();
+  const { systemPrompt, voice, voiceFocus, setSystemPrompt, setVoice, setVoiceFocus } = useSettings();
   const { tools, template, setTemplate, toggleTool, updateTool } = useTools();
   const { connected } = useLiveAPIContext();
 
@@ -185,43 +185,24 @@ export default function Sidebar() {
 
         <div className="sidebar-content">
           <div className="sidebar-section">
-            <h4 className="sidebar-section-title">Engine Mode</h4>
-            <div className="tab-bar" style={{ padding: '0 0 24px 0', background: 'transparent', border: 'none' }}>
-              <button 
-                className={`tab-button ${mode === 'transcribe' ? 'active' : ''}`}
-                onClick={() => setMode('transcribe')}
-                disabled={connected}
-              >
-                Transcribe
-              </button>
-              <button 
-                className={`tab-button ${mode === 'translate' ? 'active' : ''}`}
-                onClick={() => setMode('translate')}
-                disabled={connected}
-              >
-                Translate
-              </button>
-            </div>
-
             <h4 className="sidebar-section-title">Linguistic Profile</h4>
             <fieldset disabled={connected} style={{ border: 'none', padding: 0, margin: 0 }}>
               
-              {mode === 'translate' && (
-                <label className="sidebar-label">
-                  Target Language
-                  <select 
-                    value={template} 
-                    onChange={e => setTemplate(e.target.value as Template)} 
-                    className="sidebar-select"
-                  >
-                    {(Object.keys(LANGUAGE_LABELS) as Template[]).sort((a,b) => LANGUAGE_LABELS[a].localeCompare(LANGUAGE_LABELS[b])).map(key => (
-                      <option key={key} value={key}>
-                        {LANGUAGE_LABELS[key]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
+              <label className="sidebar-label">
+                Target Language
+                <select 
+                  value={template} 
+                  onChange={e => setTemplate(e.target.value as Template)} 
+                  className="sidebar-select"
+                >
+                  {(Object.keys(LANGUAGE_LABELS) as Template[]).sort((a,b) => LANGUAGE_LABELS[a].localeCompare(LANGUAGE_LABELS[b])).map(key => (
+                    <option key={key} value={key}>
+                      {LANGUAGE_LABELS[key]}
+                    </option>
+                  ))}
+                </select>
+                {voiceFocus && <div className="focus-badge">High Precision Active</div>}
+              </label>
 
               <div className="tool-item" style={{ marginBottom: '28px' }}>
                 <div className="tool-item-info">
@@ -235,22 +216,20 @@ export default function Sidebar() {
                 </div>
               </div>
 
-              {mode === 'translate' && (
-                <label className="sidebar-label">
-                  Neural Persona (Voice)
-                  <select 
-                    value={voice} 
-                    onChange={e => setVoice(e.target.value)} 
-                    className="sidebar-select"
-                  >
-                    {sortedVoices.map(v => (
-                      <option key={v.id} value={v.id}>
-                        {v.alias}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
+              <label className="sidebar-label">
+                Neural Persona (Voice)
+                <select 
+                  value={voice} 
+                  onChange={e => setVoice(e.target.value)} 
+                  className="sidebar-select"
+                >
+                  {sortedVoices.map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.alias}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
               <label className="sidebar-label">
                 System Directives
@@ -259,15 +238,38 @@ export default function Sidebar() {
                   onChange={e => setSystemPrompt(e.target.value)}
                   rows={8}
                   className="sidebar-textarea"
-                  placeholder="Enter custom instructions..."
+                  placeholder="Enter custom instructions for the translator..."
                 />
               </label>
             </fieldset>
           </div>
+
+          <div className="sidebar-section" style={{ marginTop: '32px' }}>
+            <h4 className="sidebar-section-title">Cognitive Tools</h4>
+            <div className="tools-list">
+              {tools.length === 0 && (
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>Standard translation engine active.</p>
+              )}
+              {tools.map(tool => (
+                <div key={tool.name} className="tool-item">
+                  <div className="tool-item-info">
+                    <input
+                      type="checkbox"
+                      id={`tool-${tool.name}`}
+                      checked={tool.isEnabled}
+                      onChange={() => toggleTool(tool.name)}
+                      disabled={connected}
+                    />
+                    <label htmlFor={`tool-${tool.name}`}>{tool.name}</label>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
         
         <div className="sidebar-footer">
-          <div className="version-tag">v3.1.0-Polyglot</div>
+          <div className="version-tag">v3.0.0-Polyglot</div>
           <div className={c('connection-indicator', { connected })}>
             {connected ? 'ENGINE ONLINE' : 'ENGINE STANDBY'}
           </div>

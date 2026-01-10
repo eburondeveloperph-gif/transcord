@@ -1,5 +1,5 @@
 {
-  "name": "Tandbox",
+  "name": "TTCall Sandbox",
   "description": "Interactive Tunning",
   "requestFramePermissions": [
     "microphone"

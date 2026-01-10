@@ -1,0 +1,166 @@
+
+.welcome-screen {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+  text-align: center;
+  color: var(--gray-300);
+  padding: 40px 20px;
+}
+
+.welcome-content {
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  animation: fadeIn 0.8s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.welcome-icon {
+  font-size: 56px;
+  background: linear-gradient(135deg, var(--accent), var(--gold));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+}
+
+.title-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.title-selector {
+  width: 100%;
+  max-width: 400px;
+}
+
+.title-selector select {
+  width: 100%;
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: white;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 12px 24px;
+  border-radius: 16px;
+  appearance: none;
+  cursor: pointer;
+  transition: all 0.3s;
+  outline: none;
+}
+
+.title-selector select:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+}
+
+.welcome-description {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  opacity: 0.8;
+  font-weight: 300;
+  max-width: 80%;
+}
+
+.launch-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, var(--accent) 0%, #1e40af 100%);
+  color: white;
+  border: none;
+  padding: 16px 32px;
+  border-radius: 100px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 30px -5px var(--accent-glow);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  margin: 10px 0;
+  animation: pulseButton 2s infinite;
+}
+
+.launch-button:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 15px 40px -5px var(--accent-glow);
+  filter: brightness(1.1);
+}
+
+.launch-button:active {
+  transform: translateY(0) scale(0.98);
+}
+
+@keyframes pulseButton {
+  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+  70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+.example-prompts-section {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.prompts-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.example-prompts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.prompt-card {
+  background-color: rgba(255, 255, 255, 0.03);
+  padding: 16px 20px;
+  border-radius: 16px;
+  font-size: 0.95rem;
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.2s;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+.prompt-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--accent-dim);
+  transform: translateX(4px);
+  color: white;
+}
+
+@media (min-width: 600px) {
+  .welcome-icon { font-size: 72px; }
+  .title-selector select { font-size: 1.5rem; padding: 16px 32px; }
+  .example-prompts { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+  .prompt-card { flex: 1; min-width: 180px; text-align: center; }
+}
+
+@media (max-width: 400px) {
+  .welcome-icon { font-size: 48px; }
+  .title-selector select { font-size: 1.1rem; }
+  .welcome-content { gap: 20px; }
+  .welcome-description { font-size: 1rem; }
+}

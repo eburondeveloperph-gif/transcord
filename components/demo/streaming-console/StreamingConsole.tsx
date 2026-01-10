@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import React, { useEffect, useRef, useState, memo, useMemo } from 'react';
-import { LiveServerContent } from '@google/genai';
+import WelcomeScreen from '../welcome-screen/WelcomeScreen';
+import { Modality, LiveServerContent, LiveConnectConfig } from '@google/genai';
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
 import { wsService } from '../../../lib/websocket-service';
 import { audioContext } from '../../../lib/utils';
@@ -12,9 +13,7 @@ import {
   useSettings,
   useLogStore,
   useTools,
-  Template,
 } from '../../../lib/state';
-import { AVAILABLE_VOICES } from '../../../lib/constants';
 
 const formatTimestamp = (date: Date) => {
   const pad = (num: number, size = 2) => num.toString().padStart(size, '0');
@@ -30,7 +29,6 @@ const formatDuration = (seconds: number) => {
 };
 
 const renderContent = (text: string) => {
-  if (!text) return null;
   const boldParts = text.split(/(\*\*.*?\*\*)/g);
   return boldParts.map((boldPart, boldIndex) => {
     if (boldPart.startsWith('**') && boldPart.endsWith('**')) {
@@ -40,43 +38,10 @@ const renderContent = (text: string) => {
   });
 };
 
-const VOICE_ALIASES: Record<string, string> = {
-  'Zephyr': 'King Aeolus',
-  'Puck': 'King Pan',
-  'Charon': 'King Hades',
-  'Kore': 'Queen Persephone',
-  'Luna': 'Queen Selene',
-  'Nova': 'Queen Asteria',
-  'Fenrir': 'King Lycaon',
-  'Leda': 'Queen Leda',
-  'Orus': 'King Horus',
-  'Aoede': 'Queen Aoede',
-  'Callirrhoe': 'Queen Callirrhoe',
-  'Autonoe': 'Queen Autonoe',
-  'Enceladus': 'King Enceladus',
-  'Iapetus': 'King Iapetus',
-  'Umbriel': 'King Erebus',
-  'Algieba': 'King Leonidas',
-  'Despina': 'Queen Despina',
-  'Erinome': 'Queen Erinome',
-  'Algenib': 'King Bellerophon',
-  'Rasalgethi': 'King Heracles',
-  'Laomedeia': 'Queen Laomedeia',
-  'Achernar': 'King Eridanos',
-  'Alnilam': 'King Orion',
-  'Schedar': 'Queen Cassiopeia',
-  'Gacrux': 'King Acrux',
-  'Pulcherrima': 'Queen Izar',
-  'Achird': 'King Cepheus',
-  'Zubenelgenubi': 'King Kiffa',
-  'Vindemiatrix': 'Queen Virgo',
-  'Sadachbia': 'King Aquarius',
-  'Sadaltager': 'King Sadaltager',
-  'Sulafat': 'Queen Lyra'
-};
-
-const getVoiceAlias = (voiceId: string) => VOICE_ALIASES[voiceId] || `Persona ${voiceId}`;
-
+/**
+ * Component for message playback controls (Play, Pause, Stop).
+ * Enhanced with progress tracking and duration display.
+ */
 const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
   const [status, setStatus] = useState<'playing' | 'paused' | 'stopped'>('stopped');
   const [progress, setProgress] = useState(0);
@@ -86,6 +51,7 @@ const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
   const bufferRef = useRef<AudioBuffer | null>(null);
   const progressIntervalRef = useRef<number | null>(null);
 
+  // PCM16: 2 bytes per sample, 24000 samples per second
   const duration = useMemo(() => audioData.length / 2 / 24000, [audioData]);
 
   const initBuffer = async () => {
@@ -199,131 +165,48 @@ const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
   );
 });
 
-const LANGUAGE_LABELS: Record<Template, string> = {
-  'dutch': 'Dutch (Netherlands)',
-  'dutch_flemish': 'Dutch (Flemish)',
-  'dutch_brabantian': 'Dutch (Brabantian)',
-  'dutch_limburgish': 'Dutch (Limburgish)',
-  'west_flemish': 'Dutch (West Flemish)',
-  'dutch_surinamese': 'Dutch (Surinamese)',
-  'afrikaans': 'Afrikaans',
-  'frisian': 'West Frisian',
-  'medumba': 'Medumba (Cameroon)',
-  'bamum': 'Bamum',
-  'ewondo': 'Ewondo',
-  'duala': 'Duala',
-  'basaa': 'Basaa',
-  'bulu': 'Bulu',
-  'fulfulde_cameroon': 'Fulfulde (Cameroon)',
-  'cameroonian_pidgin': 'Cameroonian Pidgin',
-  'french_ivory_coast': 'French (Ivory Coast)',
-  'baoule': 'Baoulé',
-  'dioula': 'Dioula',
-  'bete': 'Bété',
-  'yoruba': 'Yoruba',
-  'igbo': 'Igbo',
-  'hausa': 'Hausa',
-  'twi': 'Twi',
-  'wolof': 'Wolof',
-  'swahili': 'Swahili',
-  'amharic': 'Amharic',
-  'zulu': 'Zulu',
-  'xhosa': 'Xhosa',
-  'taglish': 'Taglish (Tagalog-English)',
-  'tagalog': 'Tagalog (Formal)',
-  'cebuano': 'Cebuano (Bisaya)',
-  'ilocano': 'Ilocano',
-  'hiligaynon': 'Hiligaynon (Ilonggo)',
-  'waray': 'Waray',
-  'kapampangan': 'Kapampangan',
-  'bikol': 'Bikol',
-  'pangasinan': 'Pangasinan',
-  'chavacano': 'Chavacano',
-  'english': 'English (International)',
-  'spanish': 'Spanish (Neutral)',
-  'spanish_mexican': 'Spanish (Mexico)',
-  'spanish_argentinian': 'Spanish (Argentina)',
-  'french': 'French (France)',
-  'french_belgium': 'French (Belgium)',
-  'german': 'German',
-  'italian': 'Italian',
-  'portuguese': 'Portuguese (Brazil)',
-  'russian': 'Russian',
-  'polish': 'Polish',
-  'ukrainian': 'Ukrainian',
-  'swedish': 'Swedish',
-  'norwegian': 'Norwegian',
-  'danish': 'Danish',
-  'finnish': 'Finnish',
-  'greek': 'Greek',
-  'czech': 'Czech',
-  'hungarian': 'Hungarian',
-  'romanian': 'Romanian',
-  'turkish': 'Turkish',
-  'japanese': 'Japanese',
-  'korean': 'Korean',
-  'mandarin': 'Chinese (Mandarin)',
-  'cantonese': 'Chinese (Cantonese)',
-  'hokkien': 'Chinese (Hokkien)',
-  'hindi': 'Hindi',
-  'bengali': 'Bengali',
-  'punjabi': 'Punjabi',
-  'marathi': 'Marathi',
-  'tamil': 'Tamil',
-  'telugu': 'Telugu',
-  'urdu': 'Urdu',
-  'arabic': 'Arabic (Standard)',
-  'arabic_egyptian': 'Arabic (Egyptian)',
-  'arabic_levantine': 'Arabic (Levantine)',
-  'arabic_gulf': 'Arabic (Gulf)',
-  'persian': 'Persian (Farsi)',
-  'hebrew': 'Hebrew',
-  'vietnamese': 'Vietnamese',
-  'thai': 'Thai',
-  'indonesian': 'Indonesian',
-  'malay': 'Malay',
-};
-
 export default function StreamingConsole() {
-  const { client, connected } = useLiveAPIContext();
-  const { voice, setVoice, mode, audioSource, setAudioSource } = useSettings();
-  const { template, setTemplate } = useTools();
+  const { client, setConfig, connected, connect } = useLiveAPIContext();
+  const { systemPrompt, voice } = useSettings();
+  const { tools } = useTools();
   const turns = useLogStore(state => state.turns);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const transcribeScrollRef = useRef<HTMLDivElement>(null);
+  const [chatValue, setChatValue] = useState('');
   
+  // Local ref to accumulate audio chunks for the current turn
   const currentAudioChunks = useRef<Uint8Array[]>([]);
 
-  const handleSendMessage = (text: string) => {
-    if (text.trim() && connected) {
-      client.send([{ text }], true);
+  const handleSendMessage = (text?: string) => {
+    const messageText = text || chatValue.trim();
+    if (messageText) {
+      if (connected) {
+        client.send([{ text: messageText }], true);
+        if (!text) setChatValue('');
+      } else {
+        connect().then(() => {
+          client.send([{ text: messageText }], true);
+          if (!text) setChatValue('');
+        }).catch(console.error);
+      }
     }
   };
 
-  const handleBroadcast = (text: string) => {
-    const success = wsService.sendPrompt(text);
-    if (!success) {
-      alert('WebSocket is not connected. Ensure the read-aloud system is running.');
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSendMessage();
     }
   };
 
+  // Database/WebSocket Integration
   useEffect(() => {
     const handleRemoteMessage = (text: string) => {
       if (text && text.trim()) {
-        if (mode === 'translate') {
-          handleSendMessage(text.trim());
-          useLogStore.getState().addTurn({
-            role: 'system',
-            text: `📡 Remote Stream: "${text}"`,
-            isFinal: true
-          });
-        } else {
-          useLogStore.getState().addTurn({
-            role: 'remote',
-            text: text.trim(),
-            isFinal: true
-          });
-        }
+        handleSendMessage(text.trim());
+        useLogStore.getState().addTurn({
+          role: 'system',
+          text: `📥 Stream Input: "${text}"`,
+          isFinal: true
+        });
       }
     };
 
@@ -333,14 +216,42 @@ export default function StreamingConsole() {
     return () => {
       wsService.off('message', handleRemoteMessage);
     };
-  }, [connected, client, mode]);
+  }, [connected, client]);
+
+  useEffect(() => {
+    const declarations = tools
+      .filter(tool => tool.isEnabled)
+      .map(tool => ({
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters,
+      }));
+
+    // Simplified config to resolve "Operation not implemented" error
+    // Removing transcriptions and using a string for systemInstruction
+    const config: LiveConnectConfig = {
+      responseModalities: [Modality.AUDIO],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: {
+            voiceName: voice,
+          },
+        },
+      },
+      systemInstruction: systemPrompt,
+    };
+
+    if (declarations.length > 0) {
+      config.tools = [{ functionDeclarations: declarations }];
+    }
+
+    setConfig(config);
+  }, [setConfig, systemPrompt, tools, voice]);
 
   useEffect(() => {
     const { addTurn, updateLastTurn } = useLogStore.getState();
 
     const handleInputTranscription = (text: string, isFinal: boolean) => {
-      // Note: In transcribe mode, we often prefer the model's high-fidelity scribe output (agent)
-      // but we still capture input transcription for redundancy or user role display.
       const turns = useLogStore.getState().turns;
       const last = turns[turns.length - 1];
       if (last && last.role === 'user' && !last.isFinal) {
@@ -370,10 +281,8 @@ export default function StreamingConsole() {
       if (!text) return;
 
       const turns = useLogStore.getState().turns;
-      // Fixed: Replace turns.at(-1) with turns[turns.length - 1] for better compatibility.
-      const last = turns[turns.length - 1];
+      const last = turns.at(-1);
 
-      // In Transcribe mode, the agent's content IS the transcription.
       if (last?.role === 'agent' && !last.isFinal) {
         updateLastTurn({ text: last.text + text });
       } else {
@@ -382,9 +291,7 @@ export default function StreamingConsole() {
     };
 
     const handleTurnComplete = () => {
-      const turns = useLogStore.getState().turns;
-      // Fixed: Replace turns.at(-1) with turns[turns.length - 1] for better compatibility.
-      const last = turns[turns.length - 1];
+      const last = useLogStore.getState().turns.at(-1);
       if (last && last.role === 'agent') {
         if (currentAudioChunks.current.length > 0) {
           const totalLength = currentAudioChunks.current.reduce((acc, curr) => acc + curr.length, 0);
@@ -424,138 +331,63 @@ export default function StreamingConsole() {
   }, [client]);
 
   useEffect(() => {
-    const activeScroll = mode === 'translate' ? scrollRef : transcribeScrollRef;
-    if (activeScroll.current) {
-      activeScroll.current.scrollTo({
-        top: activeScroll.current.scrollHeight,
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
         behavior: 'smooth'
       });
     }
-  }, [turns, mode]);
-
-  const sortedVoices = useMemo(() => {
-    return AVAILABLE_VOICES.map(v => ({
-      id: v,
-      alias: getVoiceAlias(v)
-    })).sort((a, b) => a.alias.localeCompare(b.alias));
-  }, []);
-
-  const filteredTranscribeTurns = useMemo(() => {
-    if (mode !== 'transcribe') return [];
-    return turns.filter(t => {
-      // In Transcribe mode, we prioritize 'agent' turns as they contain the scribe's output
-      if (t.role === 'agent') return true;
-      
-      if (audioSource === 'both') return t.role === 'user' || t.role === 'remote';
-      if (audioSource === 'mic') return t.role === 'user';
-      if (audioSource === 'speaker') return t.role === 'remote';
-      return false;
-    });
-  }, [turns, audioSource, mode]);
+  }, [turns]);
 
   return (
     <div className="transcription-container">
-      {mode === 'translate' ? (
-        <>
-          <div className="top-controls">
-            <div className="selector-group">
-              <span className="selector-label">Target Language</span>
-              <select 
-                value={template} 
-                onChange={(e) => setTemplate(e.target.value as Template)} 
-                className="top-select"
-                disabled={connected}
-              >
-                {(Object.keys(LANGUAGE_LABELS) as Template[])
-                  .sort((a,b) => LANGUAGE_LABELS[a].localeCompare(LANGUAGE_LABELS[b]))
-                  .map(key => (
-                    <option key={key} value={key}>
-                      {LANGUAGE_LABELS[key]}
-                    </option>
-                  ))
-                }
-              </select>
-            </div>
-            <div className="selector-group">
-              <span className="selector-label">Neural Persona</span>
-              <select 
-                value={voice} 
-                onChange={(e) => setVoice(e.target.value)} 
-                className="top-select"
-                disabled={connected}
-              >
-                {sortedVoices.map(v => (
-                  <option key={v.id} value={v.id}>
-                    {v.alias}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="transcription-view" ref={scrollRef}>
-            {turns.length === 0 && (
-              <div className="transcription-entry system">
-                <div className="transcription-text-content">
-                  Waiting for interpretation stream...
-                </div>
-              </div>
-            )}
-            {turns.map((t, i) => (
-              <div
-                key={i}
-                className={`transcription-entry ${t.role} ${!t.isFinal ? 'interim' : ''}`}
-              >
-                <div className="transcription-header">
-                  <div className="transcription-source">
-                    {t.role === 'user' ? 'Speaker' : t.role === 'agent' ? 'Translator' : 'System'}
-                  </div>
-                  <div className="transcription-timestamp">
-                    {formatTimestamp(t.timestamp)}
-                  </div>
-                </div>
-                <div className="transcription-text-content">
-                  {renderContent(t.text)}
-                </div>
-                
-                <div className="transcription-footer-actions">
-                  {t.role === 'agent' && t.audioData && (
-                    <PlaybackControls audioData={t.audioData} />
-                  )}
-                  {(t.role === 'agent' || t.role === 'user') && (
-                    <button 
-                      className="broadcast-btn-mini"
-                      onClick={() => handleBroadcast(t.text)}
-                      title="Broadcast to External Speaker"
-                    >
-                      <span className="material-symbols-outlined">campaign</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
+      {turns.length === 0 ? (
+        <WelcomeScreen />
       ) : (
-        /* Transcribe Mode View */
-        <>
-          <div className="transcribe-view" ref={transcribeScrollRef}>
-             <div className="transcribe-text-large">
-               {filteredTranscribeTurns.length === 0 ? (
-                 <div className="transcription-entry system">
-                   Engine ready. Microphone empowered. Awaiting speech...
-                 </div>
-               ) : (
-                 filteredTranscribeTurns.map((t, i) => (
-                   <span key={i} className={`transcribe-word ${t.isFinal ? 'final' : ''} ${t.role === 'remote' ? 'remote' : ''} ${t.role === 'agent' ? 'scribe' : ''}`}>
-                     {t.text}{' '}
-                   </span>
-                 ))
-               )}
-             </div>
-          </div>
-        </>
+        <div className="transcription-view" ref={scrollRef}>
+          {turns.filter(t => t.role !== 'system').map((t, i) => (
+            <div
+              key={i}
+              className={`transcription-entry ${t.role} ${!t.isFinal ? 'interim' : ''}`}
+            >
+              <div className="transcription-header">
+                <div className="transcription-source">
+                  {t.role === 'user' ? 'You' : t.role === 'agent' ? 'Translator' : 'System'}
+                </div>
+                <div className="transcription-timestamp">
+                  {formatTimestamp(t.timestamp)}
+                </div>
+              </div>
+              <div className="transcription-text-content">
+                {renderContent(t.text)}
+              </div>
+              
+              {t.role === 'agent' && t.audioData && (
+                <PlaybackControls audioData={t.audioData} />
+              )}
+            </div>
+          ))}
+        </div>
       )}
+      
+      {/* Hidden but accessible chat input for fallback/testing */}
+      <div className="chat-composer-inline">
+        <input
+          type="text"
+          className="chat-composer-input"
+          placeholder="Type a message..."
+          value={chatValue}
+          onChange={(e) => setChatValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+        <button 
+          className="chat-composer-submit" 
+          onClick={() => handleSendMessage()}
+          disabled={!chatValue.trim()}
+        >
+          <span className="material-symbols-outlined">send</span>
+        </button>
+      </div>
     </div>
   );
 }

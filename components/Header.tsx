@@ -1,28 +1,16 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useSettings } from '../lib/state';
+import { useUI } from '../lib/state';
 import { wsService } from '../lib/websocket-service';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import cn from 'classnames';
-import { useLiveAPIContext } from '../contexts/LiveAPIContext';
 
 export default function Header() {
-  const { mode, setMode, classId, setClassId, code, setCode } = useSettings();
-  const { connected, disconnect } = useLiveAPIContext();
-  
+  const { toggleSidebar } = useUI();
   const [wsStatus, setWsStatus] = useState(wsService.status);
-
-  // Switching modes MUST deactivate the previous session for the current user
-  const handleTabSwitch = useCallback((newMode: 'transcribe' | 'translate') => {
-    if (newMode !== mode) {
-      if (connected) {
-        disconnect();
-      }
-      setMode(newMode);
-    }
-  }, [mode, connected, disconnect, setMode]);
 
   useEffect(() => {
     wsService.on('status', setWsStatus);
@@ -30,58 +18,27 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="main-header">
+    <header>
       <div className="header-left">
-        <div className="header-tabs">
-          <button 
-            className={cn('tab-button-minimal', { active: mode === 'transcribe' })}
-            onClick={() => handleTabSwitch('transcribe')}
-          >
-            Transcribe
-          </button>
-          <button 
-            className={cn('tab-button-minimal', { active: mode === 'translate' })}
-            onClick={() => handleTabSwitch('translate')}
-          >
-            Translate
-          </button>
-        </div>
+        <h1>Super Translator</h1>
       </div>
-
-      <div className="header-center">
-        <div className="session-inputs">
-          <div className="header-input-group">
-            <span className="material-symbols-outlined input-icon">school</span>
-            <input 
-              type="text" 
-              placeholder="Class ID" 
-              value={classId}
-              onChange={(e) => setClassId(e.target.value)}
-              className="header-mini-input"
-            />
-          </div>
-          <div className="header-input-group">
-            <span className="material-symbols-outlined input-icon">vpn_key</span>
-            <input 
-              type="text" 
-              placeholder="Code" 
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className="header-mini-input"
-            />
-          </div>
-        </div>
-      </div>
-
       <div className="header-right">
-        <div className="header-actions-area">
-          <div className="header-icons-group">
-            <div 
-              className={cn('ws-status-dot', wsStatus)} 
-              title={`Remote Stream Status: ${wsStatus}`}
-            />
-          </div>
+        <div 
+          className={cn('ws-indicator', wsStatus)} 
+          aria-label={`Remote status: ${wsStatus}`}
+          title={`WebSocket Status: ${wsStatus}`}
+        >
+          <span className={cn('material-symbols-outlined', { 'filled': wsStatus === 'connected' })}>
+            {wsStatus === 'connected' ? 'sensors' : wsStatus === 'connecting' ? 'hourglass_top' : 'sensors_off'}
+          </span>
         </div>
+        <button
+          className="settings-button"
+          onClick={toggleSidebar}
+          aria-label="Settings"
+        >
+          <span className="material-symbols-outlined">settings</span>
+        </button>
       </div>
     </header>
   );

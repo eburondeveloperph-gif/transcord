@@ -1,11 +1,26 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
+/**
+ * Copyright 2024 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GenAILiveClient } from '../../lib/genai-live-client';
-import { LiveConnectConfig, LiveServerToolCall } from '@google/genai';
+import { LiveConnectConfig, Modality, LiveServerToolCall } from '@google/genai';
 import { AudioStreamer } from '../../lib/audio-streamer';
 import { audioContext } from '../../lib/utils';
 import VolMeterWorket from '../../lib/worklets/vol-meter';
@@ -29,11 +44,12 @@ export function useLiveApi({
 }: {
   apiKey: string;
 }): UseLiveApiResults {
-  const { model, mode } = useSettings();
+  const { model } = useSettings();
   
+  // Initialize client and handle cleanup
   const client = useMemo(() => {
-    // Note: The client now handles internal fresh instance creation of GoogleGenAI on connect
-    return new GenAILiveClient(apiKey, model);
+    const newClient = new GenAILiveClient(apiKey, model);
+    return newClient;
   }, [apiKey, model]);
 
   useEffect(() => {
@@ -51,18 +67,23 @@ export function useLiveApi({
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [config, setConfig] = useState<LiveConnectConfig>({});
 
+  // register audio for streaming server -> speakers
   useEffect(() => {
     if (!audioStreamerRef.current) {
       audioContext({ id: 'audio-out' }).then((audioCtx: AudioContext) => {
         const streamer = new AudioStreamer(audioCtx);
         audioStreamerRef.current = streamer;
         
+        // Setup state listeners for AI speaking status
         streamer.onPlay = () => setIsAiSpeaking(true);
         streamer.onStop = () => setIsAiSpeaking(false);
 
         streamer
           .addWorklet<any>('vumeter-out', VolMeterWorket, (ev: any) => {
             setVolume(ev.data.volume);
+          })
+          .then(() => {
+            // Successfully added worklet
           })
           .catch(err => {
             console.error('Error adding worklet:', err);
@@ -82,28 +103,33 @@ export function useLiveApi({
       isConnectingRef.current = false;
     };
 
+    const stopAudioStreamer = () => {
+      // We explicitly DO NOT stop the audio streamer on interruption
+    };
+
     const onAudio = (data: ArrayBuffer) => {
-      if (audioStreamerRef.current && mode !== 'transcribe') {
+      if (audioStreamerRef.current) {
         audioStreamerRef.current.addPCM16(new Uint8Array(data));
       }
     };
 
-    const onError = (e: any) => {
+    const onError = () => {
       setConnected(false);
       isConnectingRef.current = false;
-      // Error logging is handled in the GenAILiveClient which re-emits to this listener
-      // and UI is handled by ErrorScreen component listening to the same client.
     };
 
+    // Bind event listeners
     client.on('open', onOpen);
     client.on('close', onClose);
     client.on('error', onError);
+    client.on('interrupted', stopAudioStreamer);
     client.on('audio', onAudio);
 
     const onToolCall = (toolCall: LiveServerToolCall) => {
       const functionResponses: any[] = [];
 
       for (const fc of toolCall.functionCalls) {
+        // Special Handling for WebSocket Broadcasting
         if (fc.name === 'broadcast_to_websocket') {
           const text = (fc.args as any).text;
           const success = wsService.sendPrompt(text);
@@ -115,7 +141,10 @@ export function useLiveApi({
           continue;
         }
 
-        const triggerMessage = `Triggering function call: **${fc.name}**\n\`\`\`json\n${JSON.stringify(fc.args, null, 2)}\n\`\`\``;
+        // Generic Logging for other tools
+        const triggerMessage = `Triggering function call: **${
+          fc.name
+        }**\n\`\`\`json\n${JSON.stringify(fc.args, null, 2)}\n\`\`\``;
         useLogStore.getState().addTurn({
           role: 'system',
           text: triggerMessage,
@@ -135,24 +164,27 @@ export function useLiveApi({
     client.on('toolcall', onToolCall);
 
     return () => {
+      // Clean up event listeners
       client.off('open', onOpen);
       client.off('close', onClose);
       client.off('error', onError);
+      client.off('interrupted', stopAudioStreamer);
       client.off('audio', onAudio);
       client.off('toolcall', onToolCall);
     };
-  }, [client, mode]);
+  }, [client]);
 
   const connect = useCallback(async () => {
     if (connected) return;
     
+    // Return existing promise if a connection attempt is already in progress
     if (isConnectingRef.current && connectionPromiseRef.current) {
-      await connectionPromiseRef.current;
-      return;
+      return connectionPromiseRef.current;
     }
 
+    // Wait until we have a configuration before attempting to connect
     if (!config || Object.keys(config).length === 0) {
-      console.warn('Config is empty, delaying connect');
+      console.warn('LiveAPIContext: Attempted connect without config. Aborting.');
       return;
     }
 
@@ -160,12 +192,12 @@ export function useLiveApi({
     
     const connectTask = async () => {
         try {
-          // Pass process.env.API_KEY directly to connect method. 
-          // GenAILiveClient.connect uses a fresh GoogleGenAI instance internally.
-          await client.connect(config, process.env.API_KEY);
+          const success = await client.connect(config);
+          if (!success) {
+            throw new Error('WebSocket connection could not be established.');
+          }
         } catch (e: any) {
-          isConnectingRef.current = false;
-          // Re-throw to allow connectionPromiseRef to catch or the caller to catch
+          console.error("Connect task failed:", e);
           throw e;
         } finally {
           isConnectingRef.current = false;
@@ -174,20 +206,14 @@ export function useLiveApi({
     };
 
     connectionPromiseRef.current = connectTask();
-    
-    try {
-        await connectionPromiseRef.current;
-    } catch (e) {
-        // Error emitted via client.onerror inside GenAILiveClient
-        console.error('Connection attempt failed:', e);
-    }
+    return connectionPromiseRef.current;
   }, [client, config, connected]);
 
   const disconnect = useCallback(async () => {
     client.disconnect();
     setConnected(false);
     isConnectingRef.current = false;
-  }, [client]);
+  }, [setConnected, client]);
 
   return {
     client,
