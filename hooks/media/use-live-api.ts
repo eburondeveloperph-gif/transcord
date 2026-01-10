@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -90,11 +91,8 @@ export function useLiveApi({
     const onError = (e: any) => {
       setConnected(false);
       isConnectingRef.current = false;
-      
-      // Handle permission errors by potentially hinting to re-select key
-      if (e?.message?.includes('permission') || e?.message?.includes('403')) {
-        console.warn('Permission denied. Ensure your API Key is from a paid GCP project.');
-      }
+      // Error logging is handled in the GenAILiveClient which re-emits to this listener
+      // and UI is handled by ErrorScreen component listening to the same client.
     };
 
     client.on('open', onOpen);
@@ -162,9 +160,12 @@ export function useLiveApi({
     
     const connectTask = async () => {
         try {
-          // Use the current API_KEY from process.env right before connecting
-          await client.connect(config, process.env.API_KEY || apiKey);
-        } catch (e) {
+          // Pass process.env.API_KEY directly to connect method. 
+          // GenAILiveClient.connect uses a fresh GoogleGenAI instance internally.
+          await client.connect(config, process.env.API_KEY);
+        } catch (e: any) {
+          isConnectingRef.current = false;
+          // Re-throw to allow connectionPromiseRef to catch or the caller to catch
           throw e;
         } finally {
           isConnectingRef.current = false;
@@ -177,9 +178,10 @@ export function useLiveApi({
     try {
         await connectionPromiseRef.current;
     } catch (e) {
-        throw e;
+        // Error emitted via client.onerror inside GenAILiveClient
+        console.error('Connection attempt failed:', e);
     }
-  }, [client, config, connected, apiKey]);
+  }, [client, config, connected]);
 
   const disconnect = useCallback(async () => {
     client.disconnect();
