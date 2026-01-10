@@ -1,5 +1,4 @@
 
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -263,8 +262,6 @@ export default function StreamingConsole() {
       inputAudioTranscription: {},
       outputAudioTranscription: {},
       systemInstruction: systemPrompt,
-      // ELIMINATE THINKING DELAY: Set budget to 0 for instant response.
-      thinkingConfig: { thinkingBudget: 0 },
       tools: declarations.length > 0 ? [{ functionDeclarations: declarations }] : [],
     };
 

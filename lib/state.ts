@@ -8,6 +8,7 @@ import { create } from 'zustand';
 export type Template = 
   | 'taglish' 
   | 'spanish' 
+  | 'spanish_eu'
   | 'french' 
   | 'french_ivory_coast' 
   | 'french_belgium' 
@@ -16,9 +17,11 @@ export type Template =
   | 'japanese' 
   | 'korean' 
   | 'mandarin' 
+  | 'cantonese'
   | 'german' 
   | 'italian' 
   | 'portuguese' 
+  | 'portuguese_eu'
   | 'russian' 
   | 'hindi' 
   | 'arabic'
@@ -30,7 +33,9 @@ export type Template =
   | 'dutch'
   | 'swedish'
   | 'norwegian'
-  | 'danish';
+  | 'danish'
+  | 'english_uk'
+  | 'english_au';
 
 const superTranslatorPromptTemplate = `SYSTEM PROMPT (ORACLE OF TONGUES — CONTINUOUS STREAM INTERPRETER)
 
@@ -75,6 +80,7 @@ const voiceFocusActiveSnippet = `VOICE FOCUS MODE ACTIVE (MAXIMUM NEURAL SENSITI
 const getLanguageConfig = (template: Template) => {
   switch (template) {
     case 'spanish': return { lang: 'Spanish', dialect: 'Warm, expressive Latin American Spanish.' };
+    case 'spanish_eu': return { lang: 'Spanish (European)', dialect: 'Standard Castilian Spanish (Spain).' };
     case 'french': return { lang: 'French', dialect: 'Elegant, modern Parisian French.' };
     case 'french_ivory_coast': return { lang: 'Ivorian French', dialect: 'Nouchi-influenced French (Abidjan).' };
     case 'french_belgium': return { lang: 'French Belgium', dialect: 'Regional Belgian French with natural local prosody.' };
@@ -83,9 +89,11 @@ const getLanguageConfig = (template: Template) => {
     case 'japanese': return { lang: 'Japanese', dialect: 'Natural Tokyo Japanese navigating registers (Keigo) fluently.' };
     case 'korean': return { lang: 'Korean', dialect: 'Modern Seoul Korean with appropriate honorific endings.' };
     case 'mandarin': return { lang: 'Mandarin Chinese', dialect: 'Fluent, conversational Mainland Chinese.' };
+    case 'cantonese': return { lang: 'Cantonese', dialect: 'Traditional Hong Kong Cantonese.' };
     case 'german': return { lang: 'German', dialect: 'Clear, modern, and precise German.' };
     case 'italian': return { lang: 'Italian', dialect: 'Expressive, rhythmic, and passionate Italian.' };
     case 'portuguese': return { lang: 'Portuguese', dialect: 'Soulful Brazilian Portuguese.' };
+    case 'portuguese_eu': return { lang: 'Portuguese (European)', dialect: 'Standard European Portuguese.' };
     case 'russian': return { lang: 'Russian', dialect: 'Deeply expressive and soulful Russian.' };
     case 'hindi': return { lang: 'Hindi', dialect: 'Vibrant, modern Hindi (urban contemporary context).' };
     case 'arabic': return { lang: 'Arabic', dialect: 'Modern Standard Arabic or Pan-Arab White Dialect (Ammiya).' };
@@ -98,6 +106,8 @@ const getLanguageConfig = (template: Template) => {
     case 'swedish': return { lang: 'Swedish', dialect: 'Modern, melodic Swedish.' };
     case 'norwegian': return { lang: 'Norwegian', dialect: 'Natural, clear Norwegian (Bokmål).' };
     case 'danish': return { lang: 'Danish', dialect: 'Natural, modern Danish conversational style.' };
+    case 'english_uk': return { lang: 'English (UK)', dialect: 'British English (RP or modern standard).' };
+    case 'english_au': return { lang: 'English (Australia)', dialect: 'Australian English.' };
     default: return { lang: 'Taglish', dialect: 'Natural Metro Manila urban Taglish code-switching.' };
   }
 };

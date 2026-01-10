@@ -46,6 +46,12 @@ const welcomeContent: Record<Template, { label: string; title: string; descripti
     description: 'Traducción rápida y natural a español conversacional.',
     prompts: ["¿Cómo estás hoy?", "¿Me puedes ayudar con esto?", "La reunión fue muy productiva."],
   },
+  'spanish_eu': {
+    label: 'Spanish (Spain)',
+    title: 'Super Traductor',
+    description: 'Traducción al español castellano estándar.',
+    prompts: ["¿Cómo estáis vosotros?", "¿Me podéis echar una mano?", "La reunión ha sido estupenda."],
+  },
   'french': {
     label: 'French',
     title: 'Super Traducteur',
@@ -70,6 +76,12 @@ const welcomeContent: Record<Template, { label: string; title: string; descripti
     description: '流畅的中英文实时翻译。',
     prompts: ["你今天怎么样？", "你能帮 me 吗？", "会议非常有成效。"],
   },
+  'cantonese': {
+    label: 'Cantonese',
+    title: '超級翻譯',
+    description: '地道香港粵語實時翻譯。',
+    prompts: ["你今日點呀？", "唔該幫手搞搞佢？", "個會開得好順利。"],
+  },
   'german': {
     label: 'German',
     title: 'Super Übersetzer',
@@ -87,6 +99,12 @@ const welcomeContent: Record<Template, { label: string; title: string; descripti
     title: 'Super Tradutor',
     description: 'Tradução natural para português.',
     prompts: ["Como você está hoje?", "Pode me ajudar with this?", "A reunião foi produtiva."],
+  },
+  'portuguese_eu': {
+    label: 'Portuguese (EU)',
+    title: 'Super Tradutor',
+    description: 'Tradução para português europeu padrão.',
+    prompts: ["Como está hoje?", "Pode ajudar-me?", "A reunião correu muito bem."],
   },
   'russian': {
     label: 'Russian',
@@ -159,6 +177,18 @@ const welcomeContent: Record<Template, { label: string; title: string; descripti
     title: 'Superoversætter',
     description: 'Hurtig og naturlig oversættelse til dansk.',
     prompts: ["Hvordan har du det i dag?", "Kan du hjelpe meg?", "Mødet var produktivt."],
+  },
+  'english_uk': {
+    label: 'English (UK)',
+    title: 'Super Translator',
+    description: 'Translates into British English with appropriate idiom and pronunciation.',
+    prompts: ["How do you do?", "Could you give me a hand?", "The meeting was brilliant."],
+  },
+  'english_au': {
+    label: 'English (Australia)',
+    title: 'Super Translator',
+    description: 'Translates into Australian English with authentic phrasing.',
+    prompts: ["How's it going, mate?", "Can you give me a hand?", "The meeting was distinctively good."],
   }
 };
 
@@ -196,22 +226,24 @@ const WelcomeScreen: React.FC = () => {
             </select>
           </div>
         </div>
-        <p className="welcome-description">{current.description}</p>
+        <p className="welcome-description">{current?.description || "Select a language to begin."}</p>
         
-        <div className="example-prompts-section">
-          <h5 className="prompts-title">Try a sample phrase</h5>
-          <div className="example-prompts">
-            {current.prompts.map((prompt, index) => (
-              <button 
-                key={index} 
-                className="prompt-card" 
-                onClick={() => handlePromptClick(prompt)}
-              >
-                {prompt}
-              </button>
-            ))}
+        {current && (
+          <div className="example-prompts-section">
+            <h5 className="prompts-title">Try a sample phrase</h5>
+            <div className="example-prompts">
+              {current.prompts.map((prompt, index) => (
+                <button 
+                  key={index} 
+                  className="prompt-card" 
+                  onClick={() => handlePromptClick(prompt)}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

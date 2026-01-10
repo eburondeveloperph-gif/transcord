@@ -124,7 +124,15 @@ function ControlTray() {
     if (connected) {
       setMuted(!muted);
     } else {
-      connect();
+      connect().catch(console.error);
+    }
+  };
+
+  const handleMainButtonClick = () => {
+    if (connected) {
+      disconnect();
+    } else {
+      connect().catch(console.error);
     }
   };
 
@@ -172,7 +180,7 @@ function ControlTray() {
         <button
           ref={connectButtonRef}
           className={cn('icon-button main-action', { connected })}
-          onClick={connected ? disconnect : connect}
+          onClick={handleMainButtonClick}
           aria-label={connected ? 'Disconnect' : 'Connect'}
         >
           <span className="material-symbols-outlined filled">
