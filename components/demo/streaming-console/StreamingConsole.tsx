@@ -3,7 +3,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import PopUp from '../popup/PopUp';
 import WelcomeScreen from '../welcome-screen/WelcomeScreen';
 import { Modality, LiveServerContent } from '@google/genai';
@@ -33,6 +33,108 @@ const renderContent = (text: string) => {
   });
 };
 
+/**
+ * Component for message playback controls (Play, Pause, Stop).
+ */
+const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
+  const [status, setStatus] = useState<'playing' | 'paused' | 'stopped'>('stopped');
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const startTimeRef = useRef(0);
+  const pausedAtRef = useRef(0);
+  const bufferRef = useRef<AudioBuffer | null>(null);
+
+  const initAudio = async () => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+    }
+    if (!bufferRef.current) {
+      const ctx = audioContextRef.current;
+      const dataInt16 = new Int16Array(audioData.buffer);
+      const float32 = new Float32Array(dataInt16.length);
+      for (let i = 0; i < dataInt16.length; i++) {
+        float32[i] = dataInt16[i] / 32768;
+      }
+      const buffer = ctx.createBuffer(1, float32.length, 24000);
+      buffer.getChannelData(0).set(float32);
+      bufferRef.current = buffer;
+    }
+  };
+
+  const handlePlay = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await initAudio();
+    const ctx = audioContextRef.current!;
+
+    if (status === 'playing') return;
+
+    const source = ctx.createBufferSource();
+    source.buffer = bufferRef.current;
+    source.connect(ctx.destination);
+    
+    const offset = status === 'paused' ? pausedAtRef.current : 0;
+    source.start(0, offset);
+    startTimeRef.current = ctx.currentTime - offset;
+    sourceRef.current = source;
+    
+    source.onended = () => {
+      // Check if ended naturally or stopped/paused
+      if (sourceRef.current === source) {
+        setStatus('stopped');
+        pausedAtRef.current = 0;
+      }
+    };
+
+    setStatus('playing');
+  };
+
+  const handlePause = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (sourceRef.current && status === 'playing') {
+      sourceRef.current.stop();
+      pausedAtRef.current = audioContextRef.current!.currentTime - startTimeRef.current;
+      sourceRef.current = null;
+      setStatus('paused');
+    }
+  };
+
+  const handleStop = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (sourceRef.current) {
+      sourceRef.current.stop();
+      sourceRef.current = null;
+    }
+    pausedAtRef.current = 0;
+    setStatus('stopped');
+  };
+
+  useEffect(() => {
+    return () => {
+      if (sourceRef.current) {
+        sourceRef.current.stop();
+      }
+    };
+  }, []);
+
+  return (
+    <div className="playback-controls">
+      {status !== 'playing' ? (
+        <button onClick={handlePlay} title="Play interpretation">
+          <span className="material-symbols-outlined">play_arrow</span>
+        </button>
+      ) : (
+        <button onClick={handlePause} title="Pause interpretation">
+          <span className="material-symbols-outlined">pause</span>
+        </button>
+      )}
+      <button onClick={handleStop} disabled={status === 'stopped'} title="Stop">
+        <span className="material-symbols-outlined">stop</span>
+      </button>
+      {status === 'playing' && <div className="playing-indicator" />}
+    </div>
+  );
+});
+
 export default function StreamingConsole() {
   const { client, setConfig, connected, connect } = useLiveAPIContext();
   const { systemPrompt, voice } = useSettings();
@@ -42,6 +144,9 @@ export default function StreamingConsole() {
   const [showPopUp, setShowPopUp] = useState(true);
   const [audioRecorder] = useState(() => new AudioRecorder());
   const [chatValue, setChatValue] = useState('');
+  
+  // Local ref to accumulate audio chunks for the current turn
+  const currentAudioChunks = useRef<Uint8Array[]>([]);
 
   const handleClosePopUp = () => {
     setShowPopUp(false);
@@ -58,7 +163,7 @@ export default function StreamingConsole() {
         connect().then(() => {
           client.send([{ text: messageText }], true);
           if (!text) setChatValue('');
-        });
+        }).catch(console.error);
       }
     }
   };
@@ -69,7 +174,7 @@ export default function StreamingConsole() {
     }
   };
 
-  // Database/WebSocket Integration: Treat external messages as primary audio/text stream
+  // Database/WebSocket Integration
   useEffect(() => {
     const handleRemoteMessage = (text: string) => {
       if (text && text.trim()) {
@@ -131,7 +236,6 @@ export default function StreamingConsole() {
       inputAudioTranscription: {},
       outputAudioTranscription: {},
       systemInstruction: systemPrompt,
-      thinkingConfig: { thinkingBudget: 0 },
       tools: declarations.length > 0 ? [{ functionDeclarations: declarations }] : [],
     };
 
@@ -182,21 +286,42 @@ export default function StreamingConsole() {
 
     const handleTurnComplete = () => {
       const last = useLogStore.getState().turns.at(-1);
-      if (last && !last.isFinal) {
+      if (last && last.role === 'agent') {
+        // Collect current audio chunks and assign to turn
+        if (currentAudioChunks.current.length > 0) {
+          const totalLength = currentAudioChunks.current.reduce((acc, curr) => acc + curr.length, 0);
+          const audioData = new Uint8Array(totalLength);
+          let offset = 0;
+          for (const chunk of currentAudioChunks.current) {
+            audioData.set(chunk, offset);
+            offset += chunk.length;
+          }
+          updateLastTurn({ audioData, isFinal: true });
+          currentAudioChunks.current = [];
+        } else if (!last.isFinal) {
+          updateLastTurn({ isFinal: true });
+        }
+      } else if (last && !last.isFinal) {
         updateLastTurn({ isFinal: true });
       }
+    };
+
+    const onAudio = (data: ArrayBuffer) => {
+      currentAudioChunks.current.push(new Uint8Array(data));
     };
 
     client.on('inputTranscription', handleInputTranscription);
     client.on('outputTranscription', handleOutputTranscription);
     client.on('content', handleContent);
     client.on('turncomplete', handleTurnComplete);
+    client.on('audio', onAudio);
 
     return () => {
       client.off('inputTranscription', handleInputTranscription);
       client.off('outputTranscription', handleOutputTranscription);
       client.off('content', handleContent);
       client.off('turncomplete', handleTurnComplete);
+      client.off('audio', onAudio);
     };
   }, [client]);
 
@@ -232,6 +357,10 @@ export default function StreamingConsole() {
               <div className="transcription-text-content">
                 {renderContent(t.text)}
               </div>
+              
+              {t.role === 'agent' && t.audioData && (
+                <PlaybackControls audioData={t.audioData} />
+              )}
             </div>
           ))}
         </div>

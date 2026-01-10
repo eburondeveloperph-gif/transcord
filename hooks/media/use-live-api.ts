@@ -46,9 +46,11 @@ export function useLiveApi({
   apiKey: string;
 }): UseLiveApiResults {
   const { model } = useSettings();
+  // Initialize client only once per API key change
   const client = useMemo(() => new GenAILiveClient(apiKey, model), [apiKey, model]);
 
   const audioStreamerRef = useRef<AudioStreamer | null>(null);
+  const isConnectingRef = useRef(false);
 
   const [volume, setVolume] = useState(0);
   const [connected, setConnected] = useState(false);
@@ -76,10 +78,12 @@ export function useLiveApi({
   useEffect(() => {
     const onOpen = () => {
       setConnected(true);
+      isConnectingRef.current = false;
     };
 
     const onClose = () => {
       setConnected(false);
+      isConnectingRef.current = false;
     };
 
     const stopAudioStreamer = () => {
@@ -92,9 +96,15 @@ export function useLiveApi({
       }
     };
 
+    const onError = () => {
+      setConnected(false);
+      isConnectingRef.current = false;
+    };
+
     // Bind event listeners
     client.on('open', onOpen);
     client.on('close', onClose);
+    client.on('error', onError);
     client.on('interrupted', stopAudioStreamer);
     client.on('audio', onAudio);
 
@@ -140,6 +150,7 @@ export function useLiveApi({
       // Clean up event listeners
       client.off('open', onOpen);
       client.off('close', onClose);
+      client.off('error', onError);
       client.off('interrupted', stopAudioStreamer);
       client.off('audio', onAudio);
       client.off('toolcall', onToolCall);
@@ -147,16 +158,25 @@ export function useLiveApi({
   }, [client]);
 
   const connect = useCallback(async () => {
+    if (connected || isConnectingRef.current) {
+      return;
+    }
     if (!config) {
       throw new Error('config has not been set');
     }
-    client.disconnect();
-    await client.connect(config);
-  }, [client, config]);
+    isConnectingRef.current = true;
+    try {
+      await client.connect(config);
+    } catch (e) {
+      isConnectingRef.current = false;
+      throw e;
+    }
+  }, [client, config, connected]);
 
   const disconnect = useCallback(async () => {
     client.disconnect();
     setConnected(false);
+    isConnectingRef.current = false;
   }, [setConnected, client]);
 
   return {
