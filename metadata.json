@@ -1,5 +1,5 @@
 {
-  "name": "Native Audio Function Call Sandbox",
+  "name": "Tandbox",
   "description": "Interactive Tunning",
   "requestFramePermissions": [
     "microphone"

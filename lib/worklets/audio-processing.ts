@@ -22,29 +22,24 @@
 const AudioRecordingWorklet = `
 class AudioProcessingWorklet extends AudioWorkletProcessor {
 
-  // Reduced buffer to 512 samples (~32ms at 16khz) for faster upstreaming.
+  // Buffer of 512 samples (~32ms at 16khz)
   buffer = new Int16Array(512);
-
-  // current write index
   bufferWriteIndex = 0;
   
-  // Dynamic gain multiplier
-  gain = 1.0;
+  // Gain interpolation variables
+  currentGain = 1.0;
+  targetGain = 1.0;
+  smoothingFactor = 0.05; // Smoothing per sample for ultra-clean transitions
 
   constructor() {
     super();
-    this.hasAudio = false;
     this.port.onmessage = (event) => {
       if (event.data.gain !== undefined) {
-        this.gain = event.data.gain;
+        this.targetGain = event.data.gain;
       }
     };
   }
 
-  /**
-   * @param inputs Float32Array[][] [input#][channel#][sample#] so to access first inputs 1st channel inputs[0][0]
-   * @param outputs Float32Array[][]
-   */
   process(inputs) {
     if (inputs[0].length) {
       const channel0 = inputs[0][0];
@@ -67,23 +62,22 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
     const l = float32Array.length;
     
     for (let i = 0; i < l; i++) {
-      // Apply dynamic gain
-      let sample = float32Array[i] * this.gain;
+      // Sample-accurate gain smoothing (low-pass filtering the gain control)
+      this.currentGain += (this.targetGain - this.currentGain) * this.smoothingFactor;
       
-      // Soft clipping / limiting
+      let sample = float32Array[i] * this.currentGain;
+      
+      // Safety soft-clipping
       if (sample > 1.0) sample = 1.0;
       if (sample < -1.0) sample = -1.0;
 
-      // convert float32 -1 to 1 to int16 -32768 to 32767
+      // Convert to 16-bit PCM
       const int16Value = sample * 32768;
       this.buffer[this.bufferWriteIndex++] = int16Value;
+      
       if(this.bufferWriteIndex >= this.buffer.length) {
         this.sendAndClearBuffer();
       }
-    }
-
-    if(this.bufferWriteIndex >= this.buffer.length) {
-      this.sendAndClearBuffer();
     }
   }
 }
