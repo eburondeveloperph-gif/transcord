@@ -11,31 +11,96 @@ import { useState, useMemo } from 'react';
 import ToolEditorModal from './ToolEditorModal';
 
 const LANGUAGE_LABELS: Record<Template, string> = {
-  'taglish': 'Filipino Taglish',
-  'spanish': 'Spanish',
-  'french': 'French',
-  'french_ivory_coast': 'Ivorian French',
-  'french_belgium': 'French Belgium',
-  'medumba': 'Cameroon Medumba',
-  'dutch_flemish': 'Dutch Flemish',
-  'japanese': 'Japanese',
-  'korean': 'Korean',
-  'mandarin': 'Mandarin',
-  'german': 'German',
-  'italian': 'Italian',
-  'portuguese': 'Portuguese',
-  'russian': 'Russian',
-  'hindi': 'Hindi',
-  'arabic': 'Arabic',
-  'turkish': 'Turkish',
-  'vietnamese': 'Vietnamese',
-  'polish': 'Polish',
-  'thai': 'Thai',
-  'bengali': 'Bengali',
+  // Dutch & Benelux
   'dutch': 'Dutch (Netherlands)',
+  'dutch_flemish': 'Dutch (Flemish)',
+  'dutch_brabantian': 'Dutch (Brabantian)',
+  'dutch_limburgish': 'Dutch (Limburgish)',
+  'west_flemish': 'Dutch (West Flemish)',
+  'dutch_surinamese': 'Dutch (Surinamese)',
+  'afrikaans': 'Afrikaans',
+  'frisian': 'West Frisian',
+
+  // Cameroon
+  'medumba': 'Medumba (Cameroon)',
+  'bamum': 'Bamum',
+  'ewondo': 'Ewondo',
+  'duala': 'Duala',
+  'basaa': 'Basaa',
+  'bulu': 'Bulu',
+  'fulfulde_cameroon': 'Fulfulde (Cameroon)',
+  'cameroonian_pidgin': 'Cameroonian Pidgin',
+
+  // Ivory Coast
+  'french_ivory_coast': 'French (Ivory Coast)',
+  'baoule': 'Baoulé',
+  'dioula': 'Dioula',
+  'bete': 'Bété',
+
+  // Philippines
+  'taglish': 'Taglish (Tagalog-English)',
+  'tagalog': 'Tagalog (Formal)',
+  'cebuano': 'Cebuano (Bisaya)',
+  'ilocano': 'Ilocano',
+  'hiligaynon': 'Hiligaynon (Ilonggo)',
+  'waray': 'Waray',
+  'kapampangan': 'Kapampangan',
+  'bikol': 'Bikol',
+  'pangasinan': 'Pangasinan',
+  'chavacano': 'Chavacano',
+
+  // Europe
+  'english': 'English (International)',
+  'french': 'French (France)',
+  'french_belgium': 'French (Belgium)',
+  'german': 'German',
+  'spanish': 'Spanish',
+  'italian': 'Italian',
+  'portuguese': 'Portuguese (Brazil)',
+  'russian': 'Russian',
+  'polish': 'Polish',
+  'ukrainian': 'Ukrainian',
   'swedish': 'Swedish',
   'norwegian': 'Norwegian',
-  'danish': 'Danish'
+  'danish': 'Danish',
+  'finnish': 'Finnish',
+  'greek': 'Greek',
+  'czech': 'Czech',
+  'hungarian': 'Hungarian',
+  'romanian': 'Romanian',
+  'turkish': 'Turkish',
+
+  // Asia & Middle East
+  'japanese': 'Japanese',
+  'korean': 'Korean',
+  'mandarin': 'Chinese (Mandarin)',
+  'cantonese': 'Chinese (Cantonese)',
+  'hokkien': 'Chinese (Hokkien)',
+  'hindi': 'Hindi',
+  'bengali': 'Bengali',
+  'punjabi': 'Punjabi',
+  'marathi': 'Marathi',
+  'tamil': 'Tamil',
+  'telugu': 'Telugu',
+  'urdu': 'Urdu',
+  'arabic': 'Arabic',
+  'persian': 'Persian (Farsi)',
+  'hebrew': 'Hebrew',
+  'vietnamese': 'Vietnamese',
+  'thai': 'Thai',
+  'indonesian': 'Indonesian',
+  'malay': 'Malay',
+
+  // Africa (General)
+  'swahili': 'Swahili',
+  'amharic': 'Amharic',
+  'yoruba': 'Yoruba',
+  'igbo': 'Igbo',
+  'hausa': 'Hausa',
+  'twi': 'Twi',
+  'wolof': 'Wolof',
+  'zulu': 'Zulu',
+  'xhosa': 'Xhosa',
 };
 
 /**
@@ -199,7 +264,7 @@ export default function Sidebar() {
         </div>
         
         <div className="sidebar-footer">
-          <div className="version-tag">v2.9.0-Native</div>
+          <div className="version-tag">v3.0.0-Polyglot</div>
           <div className={c('connection-indicator', { connected })}>
             {connected ? 'ENGINE ONLINE' : 'ENGINE STANDBY'}
           </div>

@@ -6,31 +6,94 @@
 import { create } from 'zustand';
 
 export type Template = 
+  // --- Dutch & Benelux Dialects ---
+  | 'dutch' 
+  | 'dutch_flemish' 
+  | 'dutch_brabantian'
+  | 'dutch_limburgish'
+  | 'west_flemish'
+  | 'dutch_surinamese'
+  | 'afrikaans'
+  | 'frisian'
+
+  // --- Cameroon & Central Africa ---
+  | 'medumba' 
+  | 'bamum'
+  | 'ewondo'
+  | 'duala'
+  | 'basaa'
+  | 'bulu'
+  | 'fulfulde_cameroon'
+  | 'cameroonian_pidgin'
+
+  // --- Ivory Coast & West Africa ---
+  | 'french_ivory_coast' 
+  | 'baoule'
+  | 'dioula'
+  | 'bete'
+  | 'yoruba'
+  | 'igbo'
+  | 'hausa'
+  | 'twi'
+  | 'wolof'
+  | 'swahili'
+  | 'amharic'
+  | 'zulu'
+  | 'xhosa'
+
+  // --- Philippines ---
   | 'taglish' 
+  | 'tagalog'
+  | 'cebuano'
+  | 'ilocano'
+  | 'hiligaynon'
+  | 'waray'
+  | 'kapampangan'
+  | 'bikol'
+  | 'pangasinan'
+  | 'chavacano'
+
+  // --- Europe ---
+  | 'english'
   | 'spanish' 
   | 'french' 
-  | 'french_ivory_coast' 
   | 'french_belgium' 
-  | 'medumba' 
-  | 'dutch_flemish' 
-  | 'japanese' 
-  | 'korean' 
-  | 'mandarin' 
   | 'german' 
   | 'italian' 
   | 'portuguese' 
   | 'russian' 
-  | 'hindi' 
-  | 'arabic'
-  | 'turkish'
-  | 'vietnamese'
   | 'polish'
-  | 'thai'
-  | 'bengali'
-  | 'dutch'
   | 'swedish'
   | 'norwegian'
-  | 'danish';
+  | 'danish'
+  | 'finnish'
+  | 'greek'
+  | 'czech'
+  | 'hungarian'
+  | 'romanian'
+  | 'ukrainian'
+  | 'turkish'
+
+  // --- Asia & Middle East ---
+  | 'japanese' 
+  | 'korean' 
+  | 'mandarin' 
+  | 'cantonese'
+  | 'hokkien'
+  | 'hindi' 
+  | 'bengali'
+  | 'punjabi'
+  | 'marathi'
+  | 'tamil'
+  | 'telugu'
+  | 'urdu'
+  | 'arabic'
+  | 'persian'
+  | 'hebrew'
+  | 'vietnamese'
+  | 'thai'
+  | 'indonesian'
+  | 'malay';
 
 const superTranslatorPromptTemplate = `SYSTEM PROMPT (ORACLE OF TONGUES — CONTINUOUS STREAM INTERPRETER)
 
@@ -79,31 +142,98 @@ const voiceFocusActiveSnippet = `VOICE FOCUS MODE ACTIVE (MAXIMUM NEURAL SENSITI
 
 const getLanguageConfig = (template: Template) => {
   switch (template) {
-    case 'spanish': return { lang: 'Spanish', dialect: 'Warm, expressive Latin American Spanish.' };
-    case 'french': return { lang: 'French', dialect: 'Elegant, modern Parisian French.' };
-    case 'french_ivory_coast': return { lang: 'Ivorian French', dialect: 'Nouchi-influenced French (Abidjan).' };
-    case 'french_belgium': return { lang: 'French Belgium', dialect: 'Regional Belgian French with natural local prosody.' };
-    case 'medumba': return { lang: 'Cameroon Medumba', dialect: 'Authentic Bamileke Medumba from Cameroon, honoring oral traditions.' };
-    case 'dutch_flemish': return { lang: 'Dutch Flemish', dialect: 'Southern Belgian Dutch (Flemish) with characteristic melodic cadence.' };
-    case 'japanese': return { lang: 'Japanese', dialect: 'Natural Tokyo Japanese navigating registers (Keigo) fluently.' };
-    case 'korean': return { lang: 'Korean', dialect: 'Modern Seoul Korean with appropriate honorific endings.' };
-    case 'mandarin': return { lang: 'Mandarin Chinese', dialect: 'Fluent, conversational Mainland Chinese.' };
-    case 'german': return { lang: 'German', dialect: 'Clear, modern, and precise German.' };
-    case 'italian': return { lang: 'Italian', dialect: 'Expressive, rhythmic, and passionate Italian.' };
-    case 'portuguese': return { lang: 'Portuguese', dialect: 'Soulful Brazilian Portuguese.' };
-    case 'russian': return { lang: 'Russian', dialect: 'Deeply expressive and soulful Russian.' };
-    case 'hindi': return { lang: 'Hindi', dialect: 'Vibrant, modern Hindi (urban contemporary context).' };
-    case 'arabic': return { lang: 'Arabic', dialect: 'Modern Standard Arabic or Pan-Arab White Dialect (Ammiya).' };
-    case 'turkish': return { lang: 'Turkish', dialect: 'Modern, clear Istanbul Turkish.' };
-    case 'vietnamese': return { lang: 'Vietnamese', dialect: 'Natural Southern or Northern Vietnamese conversational style.' };
-    case 'polish': return { lang: 'Polish', dialect: 'Natural, modern Polish conversational flow.' };
-    case 'thai': return { lang: 'Thai', dialect: 'Polite and rhythmic Thai with appropriate particles (khrap/kha).' };
-    case 'bengali': return { lang: 'Bengali', dialect: 'Standard Bengali (Cholitobhasha) with natural prosody.' };
-    case 'dutch': return { lang: 'Dutch', dialect: 'Standard Netherlands Dutch, clear and modern.' };
-    case 'swedish': return { lang: 'Swedish', dialect: 'Modern, melodic Swedish.' };
-    case 'norwegian': return { lang: 'Norwegian', dialect: 'Natural, clear Norwegian (Bokmål).' };
-    case 'danish': return { lang: 'Danish', dialect: 'Natural, modern Danish conversational style.' };
-    default: return { lang: 'Taglish', dialect: 'Natural Metro Manila urban Taglish code-switching.' };
+    // --- Dutch Dialects ---
+    case 'dutch': return { lang: 'Dutch', dialect: 'Standard Netherlands Dutch (ABN).' };
+    case 'dutch_flemish': return { lang: 'Flemish', dialect: 'Belgian Dutch (Vlaams) with soft "g" and Southern prosody.' };
+    case 'dutch_brabantian': return { lang: 'Brabantian', dialect: 'Brabants dialect (North Brabant/Antwerp) with characteristic cordiality.' };
+    case 'dutch_limburgish': return { lang: 'Limburgish', dialect: 'Limburgs (Tonal) spoken in Dutch/Belgian Limburg.' };
+    case 'west_flemish': return { lang: 'West Flemish', dialect: 'West-Vlaams, distinctive coastal dialect.' };
+    case 'dutch_surinamese': return { lang: 'Surinamese Dutch', dialect: 'Surinaams-Nederlands with characteristic melody and grammar.' };
+    case 'afrikaans': return { lang: 'Afrikaans', dialect: 'Standard Afrikaans (South Africa/Namibia).' };
+    case 'frisian': return { lang: 'West Frisian', dialect: 'Frysk as spoken in Friesland.' };
+
+    // --- Cameroon ---
+    case 'medumba': return { lang: 'Medumba', dialect: 'Authentic Bamileke-Medumba (Grassfields), honoring royal tones.' };
+    case 'bamum': return { lang: 'Bamum', dialect: 'Shüpamom (Western Cameroon) with royal court precision.' };
+    case 'ewondo': return { lang: 'Ewondo', dialect: 'Kolo (Yaoundé region) with natural urban flow.' };
+    case 'duala': return { lang: 'Duala', dialect: 'Douala coastal tongue, rhythmic and mercantile.' };
+    case 'basaa': return { lang: 'Basaa', dialect: 'Mbene (Littoral/Centre Cameroon), authentic and deep.' };
+    case 'bulu': return { lang: 'Bulu', dialect: 'Bulu (South Cameroon), clear and culturally rich.' };
+    case 'fulfulde_cameroon': return { lang: 'Fulfulde', dialect: 'Cameroonian Fulfulde (Adamawa dialect).' };
+    case 'cameroonian_pidgin': return { lang: 'Cameroonian Pidgin', dialect: 'Kamtok (Cameroonian Pidgin English), urban street style.' };
+
+    // --- Ivory Coast ---
+    case 'french_ivory_coast': return { lang: 'Ivorian French', dialect: 'Nouchi slang and Abidjan French.' };
+    case 'baoule': return { lang: 'Baoulé', dialect: 'Baoulé (Akan) from central Ivory Coast.' };
+    case 'dioula': return { lang: 'Dioula', dialect: 'Jula trade language of Ivory Coast/West Africa.' };
+    case 'bete': return { lang: 'Bété', dialect: 'Bété (Gagnoa/Daloa) from South-West Ivory Coast.' };
+
+    // --- Philippines ---
+    case 'taglish': return { lang: 'Taglish', dialect: 'Urban Metro Manila Tagalog-English code-switching.' };
+    case 'tagalog': return { lang: 'Tagalog', dialect: 'Deep, formal, and pure Tagalog.' };
+    case 'cebuano': return { lang: 'Cebuano', dialect: 'Bisaya/Cebuano (Central Visayas/Mindanao).' };
+    case 'ilocano': return { lang: 'Ilocano', dialect: 'Ilokano (Northern Luzon).' };
+    case 'hiligaynon': return { lang: 'Hiligaynon', dialect: 'Ilonggo (Western Visayas) with gentle/sing-song intonation.' };
+    case 'waray': return { lang: 'Waray', dialect: 'Waray-Waray (Eastern Visayas).' };
+    case 'kapampangan': return { lang: 'Kapampangan', dialect: 'Pampanga dialect.' };
+    case 'bikol': return { lang: 'Bikol', dialect: 'Bicolano (Naga/Legazpi).' };
+    case 'pangasinan': return { lang: 'Pangasinan', dialect: 'Pangasinense.' };
+    case 'chavacano': return { lang: 'Chavacano', dialect: 'Zamboanga Chavacano (Spanish Creole).' };
+
+    // --- Asia ---
+    case 'japanese': return { lang: 'Japanese', dialect: 'Standard Tokyo Japanese.' };
+    case 'korean': return { lang: 'Korean', dialect: 'Standard Seoul Korean.' };
+    case 'mandarin': return { lang: 'Mandarin Chinese', dialect: 'Standard Putonghua.' };
+    case 'cantonese': return { lang: 'Cantonese', dialect: 'Hong Kong Cantonese.' };
+    case 'hokkien': return { lang: 'Hokkien', dialect: 'Taiwanese/Fujian Hokkien (Min Nan).' };
+    case 'hindi': return { lang: 'Hindi', dialect: 'Modern Standard Hindi.' };
+    case 'bengali': return { lang: 'Bengali', dialect: 'Standard Bengali (Kolkata/Dhaka).' };
+    case 'punjabi': return { lang: 'Punjabi', dialect: 'Eastern Punjabi (Gurmukhi).' };
+    case 'marathi': return { lang: 'Marathi', dialect: 'Standard Marathi.' };
+    case 'tamil': return { lang: 'Tamil', dialect: 'Modern spoken Tamil.' };
+    case 'telugu': return { lang: 'Telugu', dialect: 'Modern spoken Telugu.' };
+    case 'urdu': return { lang: 'Urdu', dialect: 'Standard Urdu.' };
+    case 'vietnamese': return { lang: 'Vietnamese', dialect: 'Northern (Hanoi) or Southern (Saigon) context-dependent.' };
+    case 'thai': return { lang: 'Thai', dialect: 'Central Thai.' };
+    case 'indonesian': return { lang: 'Indonesian', dialect: 'Bahasa Indonesia.' };
+    case 'malay': return { lang: 'Malay', dialect: 'Bahasa Melayu.' };
+
+    // --- Europe ---
+    case 'english': return { lang: 'English', dialect: 'Standard International English.' };
+    case 'spanish': return { lang: 'Spanish', dialect: 'Neutral Latin American Spanish.' };
+    case 'french': return { lang: 'French', dialect: 'Standard Parisian French.' };
+    case 'french_belgium': return { lang: 'Belgian French', dialect: 'Walloon French accents.' };
+    case 'german': return { lang: 'German', dialect: 'Standard High German (Hochdeutsch).' };
+    case 'italian': return { lang: 'Italian', dialect: 'Standard Italian.' };
+    case 'portuguese': return { lang: 'Portuguese', dialect: 'Brazilian Portuguese.' };
+    case 'russian': return { lang: 'Russian', dialect: 'Standard Russian.' };
+    case 'polish': return { lang: 'Polish', dialect: 'Standard Polish.' };
+    case 'ukrainian': return { lang: 'Ukrainian', dialect: 'Standard Ukrainian.' };
+    case 'swedish': return { lang: 'Swedish', dialect: 'Standard Swedish.' };
+    case 'norwegian': return { lang: 'Norwegian', dialect: 'Urban East Norwegian (Bokmål).' };
+    case 'danish': return { lang: 'Danish', dialect: 'Standard Danish.' };
+    case 'finnish': return { lang: 'Finnish', dialect: 'Standard Finnish.' };
+    case 'greek': return { lang: 'Greek', dialect: 'Modern Greek.' };
+    case 'czech': return { lang: 'Czech', dialect: 'Standard Czech.' };
+    case 'hungarian': return { lang: 'Hungarian', dialect: 'Standard Hungarian.' };
+    case 'romanian': return { lang: 'Romanian', dialect: 'Standard Romanian.' };
+    case 'turkish': return { lang: 'Turkish', dialect: 'Istanbul Turkish.' };
+
+    // --- Middle East & Africa (General) ---
+    case 'arabic': return { lang: 'Arabic', dialect: 'Modern Standard Arabic / Levantine.' };
+    case 'hebrew': return { lang: 'Hebrew', dialect: 'Modern Israeli Hebrew.' };
+    case 'persian': return { lang: 'Persian', dialect: 'Farsi (Tehran).' };
+    case 'swahili': return { lang: 'Swahili', dialect: 'Kiswahili (East Africa).' };
+    case 'amharic': return { lang: 'Amharic', dialect: 'Ethiopian Amharic.' };
+    case 'yoruba': return { lang: 'Yoruba', dialect: 'Nigerian Yoruba.' };
+    case 'igbo': return { lang: 'Igbo', dialect: 'Nigerian Igbo.' };
+    case 'hausa': return { lang: 'Hausa', dialect: 'Standard Hausa.' };
+    case 'twi': return { lang: 'Twi', dialect: 'Ashanti Twi (Ghana).' };
+    case 'wolof': return { lang: 'Wolof', dialect: 'Senegalese Wolof.' };
+    case 'zulu': return { lang: 'Zulu', dialect: 'isiZulu (South Africa).' };
+    case 'xhosa': return { lang: 'Xhosa', dialect: 'isiXhosa (South Africa).' };
+
+    default: return { lang: 'English', dialect: 'Standard English.' };
   }
 };
 
@@ -132,7 +262,7 @@ export const useSettings = create<{
   setVoice: (voice: string) => void;
   setVoiceFocus: (focus: boolean) => void;
 }>(set => ({
-  systemPrompt: generatePrompt('taglish', false),
+  systemPrompt: generatePrompt('dutch', false), // Default to Dutch as per focus
   model: DEFAULT_LIVE_API_MODEL,
   voice: DEFAULT_VOICE,
   voiceFocus: false,
@@ -174,7 +304,7 @@ export const useTools = create<{
   updateTool: (oldName: string, updatedTool: FunctionCall) => void;
 }>(set => ({
   tools: [],
-  template: 'taglish',
+  template: 'dutch', // Default to Dutch
   setTemplate: (template: Template) => {
     set({ tools: [], template });
     const voiceFocus = useSettings.getState().voiceFocus;
