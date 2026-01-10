@@ -48,15 +48,16 @@ export default function StreamingConsole() {
     connect().catch(console.error);
   };
 
-  const handleSendMessage = () => {
-    if (chatValue.trim()) {
+  const handleSendMessage = (text?: string) => {
+    const messageText = text || chatValue.trim();
+    if (messageText) {
       if (connected) {
-        client.send([{ text: chatValue.trim() }], true);
-        setChatValue('');
+        client.send([{ text: messageText }], true);
+        if (!text) setChatValue('');
       } else {
         connect().then(() => {
-          client.send([{ text: chatValue.trim() }], true);
-          setChatValue('');
+          client.send([{ text: messageText }], true);
+          if (!text) setChatValue('');
         });
       }
     }
@@ -68,21 +69,17 @@ export default function StreamingConsole() {
     }
   };
 
-  // WebSocket Integration for Remote Read-Aloud
+  // Database/WebSocket Integration: Treat external messages as primary audio/text stream
   useEffect(() => {
-    if (!connected) {
-      wsService.disconnect();
-      return;
-    }
-
     const handleRemoteMessage = (text: string) => {
-      client.send([{ text }], true);
-      
-      useLogStore.getState().addTurn({
-        role: 'system',
-        text: `📢 WebSocket Triggered Read-Aloud: "${text}"`,
-        isFinal: true
-      });
+      if (text && text.trim()) {
+        handleSendMessage(text.trim());
+        useLogStore.getState().addTurn({
+          role: 'system',
+          text: `📥 Stream Input (Database): "${text}"`,
+          isFinal: true
+        });
+      }
     };
 
     wsService.on('message', handleRemoteMessage);
@@ -226,7 +223,7 @@ export default function StreamingConsole() {
             >
               <div className="transcription-header">
                 <div className="transcription-source">
-                  {t.role === 'user' ? 'Speaker' : 'Oracle'}
+                  {t.role === 'user' ? 'Speaker' : t.role === 'agent' ? 'Oracle' : 'Stream'}
                 </div>
                 <div className="transcription-timestamp">
                   {formatTimestamp(t.timestamp)}
@@ -252,7 +249,7 @@ export default function StreamingConsole() {
           />
           <button 
             className="chat-composer-submit" 
-            onClick={handleSendMessage}
+            onClick={() => handleSendMessage()}
             disabled={!chatValue.trim()}
           >
             <span className="material-symbols-outlined">send</span>

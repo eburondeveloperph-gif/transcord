@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -76,7 +77,7 @@ function ControlTray() {
 
   return (
     <section className="control-tray-floating">
-      <div className="floating-pill">
+      <div className={cn('floating-pill', { 'focus-active': voiceFocus && connected })}>
         <button
           className="icon-button"
           onClick={toggleSidebar}
@@ -107,7 +108,8 @@ function ControlTray() {
         <button
           className={cn('icon-button focus-mode', { active: voiceFocus })}
           onClick={() => setVoiceFocus(!voiceFocus)}
-          aria-label="Voice Focus"
+          aria-label={voiceFocus ? "Disable Voice Focus" : "Enable Voice Focus (Neural Sensitivity)"}
+          title={voiceFocus ? "Neural Sensitivity Active" : "Heighten Sensitivity"}
         >
           <span className={cn('material-symbols-outlined', { 'filled': voiceFocus })}>
             {voiceFocus ? 'track_changes' : 'filter_center_focus'}
