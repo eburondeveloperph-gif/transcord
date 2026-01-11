@@ -170,6 +170,11 @@ export default function Sidebar() {
     })).sort((a, b) => a.alias.localeCompare(b.alias));
   }, []);
 
+  const sortedLanguages = useMemo(() => {
+    return (Object.keys(LANGUAGE_LABELS) as Template[])
+      .sort((a, b) => LANGUAGE_LABELS[a].localeCompare(LANGUAGE_LABELS[b]));
+  }, []);
+
   return (
     <>
       <aside className={c('sidebar', { open: isSidebarOpen })}>
@@ -195,16 +200,15 @@ export default function Sidebar() {
                   onChange={e => setTemplate(e.target.value as Template)} 
                   className="sidebar-select"
                 >
-                  {(Object.keys(LANGUAGE_LABELS) as Template[]).sort((a,b) => LANGUAGE_LABELS[a].localeCompare(LANGUAGE_LABELS[b])).map(key => (
+                  {sortedLanguages.map(key => (
                     <option key={key} value={key}>
                       {LANGUAGE_LABELS[key]}
                     </option>
                   ))}
                 </select>
-                {voiceFocus && <div className="focus-badge">High Precision Active</div>}
               </label>
 
-              <div className="tool-item" style={{ marginBottom: '28px' }}>
+              <div className="tool-item" style={{ marginBottom: '24px' }}>
                 <div className="tool-item-info">
                   <input
                     type="checkbox"
@@ -212,7 +216,7 @@ export default function Sidebar() {
                     checked={voiceFocus}
                     onChange={(e) => setVoiceFocus(e.target.checked)}
                   />
-                  <label htmlFor="voice-focus-toggle">Neural Sensitivity (Voice Focus)</label>
+                  <label htmlFor="voice-focus-toggle">Neural Sensitivity (Focus)</label>
                 </div>
               </div>
 
@@ -236,19 +240,19 @@ export default function Sidebar() {
                 <textarea
                   value={systemPrompt}
                   onChange={e => setSystemPrompt(e.target.value)}
-                  rows={8}
+                  rows={6}
                   className="sidebar-textarea"
-                  placeholder="Enter custom instructions for the translator..."
+                  placeholder="Enter custom instructions..."
                 />
               </label>
             </fieldset>
           </div>
 
-          <div className="sidebar-section" style={{ marginTop: '32px' }}>
+          <div className="sidebar-section" style={{ marginTop: '24px' }}>
             <h4 className="sidebar-section-title">Cognitive Tools</h4>
             <div className="tools-list">
               {tools.length === 0 && (
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>Standard translation engine active.</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>Standard mode active.</p>
               )}
               {tools.map(tool => (
                 <div key={tool.name} className="tool-item">
@@ -268,10 +272,10 @@ export default function Sidebar() {
           </div>
         </div>
         
-        <div className="sidebar-footer">
-          <div className="version-tag">v3.0.0-Polyglot</div>
-          <div className={c('connection-indicator', { connected })}>
-            {connected ? 'ENGINE ONLINE' : 'ENGINE STANDBY'}
+        <div className="sidebar-footer" style={{ marginTop: 'auto', paddingTop: '20px' }}>
+          <div className="version-tag" style={{ fontSize: '0.65rem', opacity: 0.4 }}>v3.0.0-Polyglot</div>
+          <div className={c('connection-indicator', { connected })} style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+            {connected ? '● ONLINE' : '○ STANDBY'}
           </div>
         </div>
       </aside>

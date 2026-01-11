@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -52,12 +53,6 @@ export function useLiveApi({
     return newClient;
   }, [apiKey, model]);
 
-  useEffect(() => {
-    return () => {
-      client.disconnect();
-    };
-  }, [client]);
-
   const audioStreamerRef = useRef<AudioStreamer | null>(null);
   const isConnectingRef = useRef(false);
   const connectionPromiseRef = useRef<Promise<void> | null>(null);
@@ -66,6 +61,28 @@ export function useLiveApi({
   const [connected, setConnected] = useState(false);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [config, setConfig] = useState<LiveConnectConfig>({});
+
+  // Monitor config changes to potentially restart session
+  // This allows "dynamic" setting of language/voice even when already online
+  const prevConfigRef = useRef<string>("");
+  useEffect(() => {
+    const configStr = JSON.stringify(config);
+    if (connected && prevConfigRef.current && prevConfigRef.current !== configStr) {
+      console.log("Configuration changed while connected. Restarting session to apply...");
+      client.disconnect();
+      // Brief delay to ensure closure then reconnect with new config
+      setTimeout(() => {
+        client.connect(config).catch(err => console.error("Reconnect failed after config change:", err));
+      }, 500);
+    }
+    prevConfigRef.current = configStr;
+  }, [config, connected, client]);
+
+  useEffect(() => {
+    return () => {
+      client.disconnect();
+    };
+  }, [client]);
 
   // register audio for streaming server -> speakers
   useEffect(() => {

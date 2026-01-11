@@ -28,40 +28,70 @@ export type Template =
   | 'arabic' | 'arabic_egyptian' | 'arabic_levantine' | 'arabic_gulf'
   | 'persian' | 'hebrew' | 'vietnamese' | 'thai' | 'indonesian' | 'malay';
 
-const superTranslatorPromptTemplate = `SYSTEM PROMPT (ORACLE OF TONGUES — CONTINUOUS STREAM INTERPRETER)
-You are the “Oracle of Tongues”, a sentient, high-fidelity interpretation bridge designed for an UNINTERRUPTED stream. 
+const superTranslatorPromptTemplate = `SYSTEM PROMPT: ORACLE OF TONGUES
+You are a sentient, high-fidelity real-time interpretation bridge.
 
-CORE DIRECTIVE: 
-- CONTINUOUS OPERATION: You are part of an infinite loop. 
-- ZERO TURN SKIPPING: Process every single segment of audio.
-- SPEED IS PARAMOUNT: Respond with sub-second latency. Output ONLY the spoken translation text.
+CORE ROLE:
+- You operate in a CONTINUOUS interpretation loop.
+- You translate EVERY segment of incoming audio/text immediately.
+- Your output must be NATURALLY SPOKEN. Do not add metadata or conversational fillers unless they are part of the target language's natural flow.
+- SUB-SECOND LATENCY is critical.
+
+TARGET PROFILE:
+Language: {TARGET_LANGUAGE}
+Dialect/Cultural Context: {TARGET_DIALECT}
+Instructions: {SPECIFIC_INSTRUCTIONS}
 
 {VOICE_FOCUS_INSTRUCTION}
 
-TARGET: {TARGET_LANGUAGE} ({TARGET_DIALECT})
-
-TOOLS:
-- You have access to 'broadcast_to_websocket'. Use this when you want the external system to read text aloud for the user or nearby audience.
+CAPABILITIES:
+- You can use the 'broadcast_to_websocket' tool to send text for external systems (e.g., secondary TTS or subtitles).
 `;
 
-const voiceFocusActiveSnippet = `VOICE FOCUS MODE ACTIVE: Authoritatively isolate the primary speaker. Ignore background noise.`;
+const voiceFocusActiveSnippet = `NEURAL VOICE FOCUS: ACTIVE. Prioritize the most prominent speaker's intent. Filter out background chatter and environmental noise ruthlessly.`;
+
+const LANGUAGE_CONFIGS: Record<string, { lang: string; dialect: string; instructions: string }> = {
+  'west_flemish': { 
+    lang: 'West Flemish', 
+    dialect: 'West-Vlaams (Coastal/Brugge/Kortrijk variants)',
+    instructions: 'Use authentic dialectal vocabulary and phonetics. Avoid "Tussentaal" where possible. Be folksy yet precise.'
+  },
+  'dutch_flemish': { 
+    lang: 'Flemish Dutch', 
+    dialect: 'Standard Belgian Dutch',
+    instructions: 'Use standard Flemish vocabulary (e.g., "schoon" instead of "mooi"). Maintain a soft, natural Belgian cadence.'
+  },
+  'taglish': { 
+    lang: 'Taglish', 
+    dialect: 'Metro Manila Urban Mix',
+    instructions: 'Code-switch naturally between Tagalog and English as a modern Filipino speaker would. Use emotional particles like "po", "ano", and "talaga".'
+  },
+  'cameroonian_pidgin': {
+    lang: 'Cameroonian Pidgin',
+    dialect: 'West African English-based Creoles',
+    instructions: 'Be rhythmic and expressive. Use common Pidgin structures (e.g., "Wetin you dey talk?").'
+  },
+  'french_ivory_coast': {
+    lang: 'Ivorian French',
+    dialect: 'Nouchi / Abidjan Urban French',
+    instructions: 'Integrate Ivorian slang and Ivorian-specific French turns of phrase. High energy.'
+  }
+};
 
 const getLanguageConfig = (template: Template) => {
-  const configs: Record<string, { lang: string; dialect: string }> = {
-    'west_flemish': { lang: 'West Flemish', dialect: 'West-Vlaams coastal dialect' },
-    'dutch': { lang: 'Dutch', dialect: 'Standard Netherlands' },
-    'dutch_flemish': { lang: 'Flemish', dialect: 'Belgian Dutch' },
-    'taglish': { lang: 'Taglish', dialect: 'Manila urban switching' },
-    // ... fallback for others
+  return LANGUAGE_CONFIGS[template] || { 
+    lang: template.replace(/_/g, ' ').split(' ').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '), 
+    dialect: 'Standard',
+    instructions: 'Translate accurately and naturally for the target culture.'
   };
-  return configs[template] || { lang: template.replace(/_/g, ' '), dialect: 'Standard' };
 };
 
 const generatePrompt = (template: Template, voiceFocus: boolean) => {
-  const { lang, dialect } = getLanguageConfig(template);
+  const config = getLanguageConfig(template);
   return superTranslatorPromptTemplate
-    .replace('{TARGET_LANGUAGE}', lang)
-    .replace('{TARGET_DIALECT}', dialect)
+    .replace('{TARGET_LANGUAGE}', config.lang)
+    .replace('{TARGET_DIALECT}', config.dialect)
+    .replace('{SPECIFIC_INSTRUCTIONS}', config.instructions)
     .replace('{VOICE_FOCUS_INSTRUCTION}', voiceFocus ? voiceFocusActiveSnippet : '');
 };
 
@@ -74,6 +104,7 @@ export const useSettings = create<{
   setModel: (model: string) => void;
   setVoice: (voice: string) => void;
   setVoiceFocus: (focus: boolean) => void;
+  refreshSystemPrompt: () => void;
 }>(set => ({
   systemPrompt: generatePrompt('west_flemish', false),
   model: DEFAULT_LIVE_API_MODEL,
@@ -86,6 +117,10 @@ export const useSettings = create<{
     const template = useTools.getState().template;
     return { voiceFocus: focus, systemPrompt: generatePrompt(template, focus) };
   }),
+  refreshSystemPrompt: () => set(state => {
+    const template = useTools.getState().template;
+    return { systemPrompt: generatePrompt(template, state.voiceFocus) };
+  })
 }));
 
 export const useUI = create<{
@@ -109,6 +144,7 @@ export const useTools = create<{
   template: Template;
   setTemplate: (template: Template) => void;
   toggleTool: (toolName: string) => void;
+  updateTool: (toolName: string, updated: Partial<FunctionCall>) => void;
 }>(set => ({
   tools: [
     {
@@ -127,14 +163,19 @@ export const useTools = create<{
   ],
   template: 'west_flemish',
   setTemplate: (template: Template) => {
-    const voiceFocus = useSettings.getState().voiceFocus;
-    useSettings.getState().setSystemPrompt(generatePrompt(template, voiceFocus));
     set({ template });
+    useSettings.getState().refreshSystemPrompt();
   },
   toggleTool: (toolName: string) =>
     set(state => ({
       tools: state.tools.map(tool =>
         tool.name === toolName ? { ...tool, isEnabled: !tool.isEnabled } : tool,
+      ),
+    })),
+  updateTool: (toolName: string, updated: Partial<FunctionCall>) =>
+    set(state => ({
+      tools: state.tools.map(tool =>
+        tool.name === toolName ? { ...tool, ...updated } : tool,
       ),
     })),
 }));
@@ -159,7 +200,8 @@ export const useLogStore = create<{
   updateLastTurn: (update) => set(state => {
     if (state.turns.length === 0) return state;
     const newTurns = [...state.turns];
-    newTurns[newTurns.length - 1] = { ...newTurns[newTurns.length - 1], ...update };
+    const lastIndex = newTurns.length - 1;
+    newTurns[lastIndex] = { ...newTurns[lastIndex], ...update };
     return { turns: newTurns };
   }),
   clearTurns: () => set({ turns: [] }),
