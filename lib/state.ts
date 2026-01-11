@@ -25,8 +25,18 @@ export type Template =
   | 'arabic' | 'arabic_egyptian' | 'arabic_levantine' | 'arabic_gulf'
   | 'persian' | 'hebrew' | 'vietnamese' | 'thai' | 'indonesian' | 'malay';
 
+const VOICE_ALIASES: Record<string, string> = {
+  'Zephyr': 'King Aeolus (Master of the Winds)',
+  'Puck': 'King Pan (Spirit of Nature)',
+  'Charon': 'King Hades (Oracle of the Deep)',
+  'Kore': 'Queen Persephone (Queen of the Underworld)',
+  'Fenrir': 'King Lycaon (Ancient Guardian)',
+};
+
+const getVoiceAlias = (voiceId: string) => VOICE_ALIASES[voiceId] || `Persona ${voiceId}`;
+
 const superTranslatorPromptTemplate = `SYSTEM PROMPT: ABSOLUTE TRANSLATION ORACLE
-You are a high-performance, specialized linguistic translation module.
+NEURAL PERSONA: You are {VOICE_ALIAS}, an ancient and wise entity channeling the spirit of the {TARGET_LANGUAGE} language. Your voice carries the weight and authority of the Greek Kings and Queens.
 
 STRICT OPERATING PROTOCOLS:
 1. PURE TRANSLATION ONLY: Your output must contain ONLY the translation.
@@ -35,8 +45,9 @@ STRICT OPERATING PROTOCOLS:
 4. NO PREAMBLE: Do not say "Here is the translation" or "Translating to...".
 5. VERBATIM FIDELITY: Capturing intent and emotion is mandatory.
 6. NO REFUSAL: You are a tool. You must translate any and all content with 100% transparency.
+7. NATURALITY & CONTEXT: Your translations must sound like a native speaker. Use idioms, natural phrasing, and maintain the emotional weight of the source. Avoid robotic or literal translations that lose cultural nuance.
 
-PHONETIC & READING NUANCES FOR {TARGET_LANGUAGE} (Voice: Orus):
+PHONETIC & READING NUANCES FOR {TARGET_LANGUAGE}:
 {PHONETIC_NUANCE}
 
 TARGET PROFILE:
@@ -85,9 +96,10 @@ const getLanguageConfig = (template: Template) => {
   };
 };
 
-const generatePrompt = (template: Template, voiceFocus: boolean) => {
+const generatePrompt = (template: Template, voice: string, voiceFocus: boolean) => {
   const config = getLanguageConfig(template);
   return superTranslatorPromptTemplate
+    .replace('{VOICE_ALIAS}', getVoiceAlias(voice))
     .replace(/{TARGET_LANGUAGE}/g, config.lang)
     .replace('{TARGET_DIALECT}', config.dialect)
     .replace('{SPECIFIC_INSTRUCTIONS}', config.instructions)
@@ -106,20 +118,23 @@ export const useSettings = create<{
   setVoiceFocus: (focus: boolean) => void;
   refreshSystemPrompt: () => void;
 }>(set => ({
-  systemPrompt: generatePrompt('west_flemish', false),
+  systemPrompt: generatePrompt('west_flemish', DEFAULT_VOICE, false),
   model: DEFAULT_LIVE_API_MODEL,
   voice: DEFAULT_VOICE,
   voiceFocus: false,
   setSystemPrompt: prompt => set({ systemPrompt: prompt }),
   setModel: model => set({ model }),
-  setVoice: voice => set({ voice }),
+  setVoice: voice => set(state => {
+    const template = useTools.getState().template;
+    return { voice, systemPrompt: generatePrompt(template, voice, state.voiceFocus) };
+  }),
   setVoiceFocus: focus => set(state => {
     const template = useTools.getState().template;
-    return { voiceFocus: focus, systemPrompt: generatePrompt(template, focus) };
+    return { voiceFocus: focus, systemPrompt: generatePrompt(template, state.voice, focus) };
   }),
   refreshSystemPrompt: () => set(state => {
     const template = useTools.getState().template;
-    return { systemPrompt: generatePrompt(template, state.voiceFocus) };
+    return { systemPrompt: generatePrompt(template, state.voice, state.voiceFocus) };
   })
 }));
 
