@@ -17,27 +17,29 @@ import EventEmitter from 'eventemitter3';
  * GenAILiveClient wraps the Gemini Live API session and provides an event-driven interface
  * for handling audio, transcriptions, and tool calls.
  */
-// Fixed: Using composition instead of inheritance to avoid potential issues with EventEmitter inheritance in this environment.
 export class GenAILiveClient {
-  private ai: GoogleGenAI;
   private sessionPromise: Promise<Session> | null = null;
   private session: Session | null = null;
   private model: string;
+  private apiKey: string;
   private emitter = new EventEmitter();
 
   public on = this.emitter.on.bind(this.emitter);
   public off = this.emitter.off.bind(this.emitter);
 
   constructor(apiKey: string, model: string) {
+    this.apiKey = apiKey;
     this.model = model;
-    this.ai = new GoogleGenAI({ apiKey });
   }
 
   /**
    * Connects to the Gemini Live API session.
    */
   async connect(config: LiveConnectConfig): Promise<boolean> {
-    this.sessionPromise = this.ai.live.connect({
+    // Re-initialize AI instance right before connection to ensure fresh credentials
+    const ai = new GoogleGenAI({ apiKey: this.apiKey });
+    
+    this.sessionPromise = ai.live.connect({
       model: this.model,
       config: config,
       callbacks: {

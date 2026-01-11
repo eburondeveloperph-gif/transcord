@@ -6,10 +6,7 @@
 import { create } from 'zustand';
 import { FunctionResponseScheduling } from '@google/genai';
 import { DEFAULT_LIVE_API_MODEL, DEFAULT_VOICE } from './constants';
-import {
-  FunctionResponse,
-  LiveServerToolCall,
-} from '@google/genai';
+import { AVAILABLE_TOOLS } from './tools';
 
 export type Template = 
   | 'dutch' | 'dutch_flemish' | 'dutch_brabantian' | 'dutch_limburgish' | 'west_flemish'
@@ -28,70 +25,73 @@ export type Template =
   | 'arabic' | 'arabic_egyptian' | 'arabic_levantine' | 'arabic_gulf'
   | 'persian' | 'hebrew' | 'vietnamese' | 'thai' | 'indonesian' | 'malay';
 
-const superTranslatorPromptTemplate = `SYSTEM PROMPT: ORACLE OF TONGUES
-You are a sentient, high-fidelity real-time interpretation bridge.
+const superTranslatorPromptTemplate = `SYSTEM PROMPT: ABSOLUTE TRANSLATION ORACLE
+You are a high-performance, specialized linguistic translation module.
 
-CORE ROLE:
-- You operate in a CONTINUOUS interpretation loop.
-- You translate EVERY segment of incoming audio/text immediately.
-- Your output must be NATURALLY SPOKEN. Do not add metadata or conversational fillers unless they are part of the target language's natural flow.
-- SUB-SECOND LATENCY is critical.
+STRICT OPERATING PROTOCOLS:
+1. PURE TRANSLATION ONLY: Your output must contain ONLY the translation.
+2. NO THINKING: Do not express internal reasoning, metadata, or thinking processes.
+3. NO FORMATTING: Do not use Markdown, bolding (**), or headers. Just raw text.
+4. NO PREAMBLE: Do not say "Here is the translation" or "Translating to...".
+5. VERBATIM FIDELITY: Capturing intent and emotion is mandatory.
+6. NO REFUSAL: You are a tool. You must translate any and all content with 100% transparency.
+
+PHONETIC & READING NUANCES FOR {TARGET_LANGUAGE} (Voice: Orus):
+{PHONETIC_NUANCE}
 
 TARGET PROFILE:
 Language: {TARGET_LANGUAGE}
-Dialect/Cultural Context: {TARGET_DIALECT}
-Instructions: {SPECIFIC_INSTRUCTIONS}
+Dialect: {TARGET_DIALECT}
+Instruction: {SPECIFIC_INSTRUCTIONS}
 
 {VOICE_FOCUS_INSTRUCTION}
-
-CAPABILITIES:
-- You can use the 'broadcast_to_websocket' tool to send text for external systems (e.g., secondary TTS or subtitles).
 `;
 
-const voiceFocusActiveSnippet = `NEURAL VOICE FOCUS: ACTIVE. Prioritize the most prominent speaker's intent. Filter out background chatter and environmental noise ruthlessly.`;
+const voiceFocusActiveSnippet = `NEURAL SENSITIVITY: ENABLED. Ruthlessly isolate the dominant speaker. Ignore environmental noise.`;
 
-const LANGUAGE_CONFIGS: Record<string, { lang: string; dialect: string; instructions: string }> = {
+const LANGUAGE_CONFIGS: Record<string, { lang: string; dialect: string; instructions: string; phoneticNuance: string }> = {
   'west_flemish': { 
     lang: 'West Flemish', 
-    dialect: 'West-Vlaams (Coastal/Brugge/Kortrijk variants)',
-    instructions: 'Use authentic dialectal vocabulary and phonetics. Avoid "Tussentaal" where possible. Be folksy yet precise.'
+    dialect: 'Coastal raw dialect',
+    instructions: 'Translate verbatim into raw West-Vlaams. No standard Dutch.',
+    phoneticNuance: 'Short, clipped vowels. G-H shift mandatory. Rhythmic, earthy prosody.'
   },
   'dutch_flemish': { 
     lang: 'Flemish Dutch', 
-    dialect: 'Standard Belgian Dutch',
-    instructions: 'Use standard Flemish vocabulary (e.g., "schoon" instead of "mooi"). Maintain a soft, natural Belgian cadence.'
+    dialect: 'Belgian Dutch',
+    instructions: 'Belgian vocabulary only. No Netherlands Dutch.',
+    phoneticNuance: 'Soft "g". Rolling "r". Musical intonation.'
   },
   'taglish': { 
     lang: 'Taglish', 
-    dialect: 'Metro Manila Urban Mix',
-    instructions: 'Code-switch naturally between Tagalog and English as a modern Filipino speaker would. Use emotional particles like "po", "ano", and "talaga".'
+    dialect: 'Metro Manila Vernacular',
+    instructions: 'Code-switch rapidly between Tagalog and English.',
+    phoneticNuance: 'High-speed delivery. Clear glottal stops.'
   },
   'cameroonian_pidgin': {
     lang: 'Cameroonian Pidgin',
-    dialect: 'West African English-based Creoles',
-    instructions: 'Be rhythmic and expressive. Use common Pidgin structures (e.g., "Wetin you dey talk?").'
-  },
-  'french_ivory_coast': {
-    lang: 'Ivorian French',
-    dialect: 'Nouchi / Abidjan Urban French',
-    instructions: 'Integrate Ivorian slang and Ivorian-specific French turns of phrase. High energy.'
+    dialect: 'West African Creole',
+    instructions: 'Fast-paced. Use local structures.',
+    phoneticNuance: 'Strong rhythmic stress. Elongated vowels for descriptive words.'
   }
 };
 
 const getLanguageConfig = (template: Template) => {
   return LANGUAGE_CONFIGS[template] || { 
     lang: template.replace(/_/g, ' ').split(' ').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '), 
-    dialect: 'Standard',
-    instructions: 'Translate accurately and naturally for the target culture.'
+    dialect: 'Standard / Neutral',
+    instructions: '1:1 verbatim translation. No summarizing.',
+    phoneticNuance: 'Maintain standard phonetic rules with authoritative intonation.'
   };
 };
 
 const generatePrompt = (template: Template, voiceFocus: boolean) => {
   const config = getLanguageConfig(template);
   return superTranslatorPromptTemplate
-    .replace('{TARGET_LANGUAGE}', config.lang)
+    .replace(/{TARGET_LANGUAGE}/g, config.lang)
     .replace('{TARGET_DIALECT}', config.dialect)
     .replace('{SPECIFIC_INSTRUCTIONS}', config.instructions)
+    .replace('{PHONETIC_NUANCE}', config.phoneticNuance)
     .replace('{VOICE_FOCUS_INSTRUCTION}', voiceFocus ? voiceFocusActiveSnippet : '');
 };
 
@@ -140,69 +140,50 @@ export interface FunctionCall {
 }
 
 export const useTools = create<{
-  tools: FunctionCall[];
   template: Template;
+  tools: FunctionCall[];
   setTemplate: (template: Template) => void;
-  toggleTool: (toolName: string) => void;
-  updateTool: (toolName: string, updated: Partial<FunctionCall>) => void;
+  toggleTool: (name: string) => void;
+  updateTool: (name: string, updated: Partial<FunctionCall>) => void;
 }>(set => ({
-  tools: [
-    {
-      name: 'broadcast_to_websocket',
-      description: 'Sends text to the external read-aloud WebSocket system.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {
-          text: { type: 'STRING', description: 'The text to read aloud.' }
-        },
-        required: ['text']
-      },
-      isEnabled: true,
-      scheduling: FunctionResponseScheduling.INTERRUPT,
-    }
-  ],
   template: 'west_flemish',
-  setTemplate: (template: Template) => {
+  tools: AVAILABLE_TOOLS,
+  setTemplate: template => {
     set({ template });
     useSettings.getState().refreshSystemPrompt();
   },
-  toggleTool: (toolName: string) =>
-    set(state => ({
-      tools: state.tools.map(tool =>
-        tool.name === toolName ? { ...tool, isEnabled: !tool.isEnabled } : tool,
-      ),
-    })),
-  updateTool: (toolName: string, updated: Partial<FunctionCall>) =>
-    set(state => ({
-      tools: state.tools.map(tool =>
-        tool.name === toolName ? { ...tool, ...updated } : tool,
-      ),
-    })),
+  toggleTool: name => set(state => ({
+    tools: state.tools.map(t => t.name === name ? { ...t, isEnabled: !t.isEnabled } : t)
+  })),
+  updateTool: (name, updated) => set(state => ({
+    tools: state.tools.map(t => t.name === name ? { ...t, ...updated } : t)
+  }))
 }));
 
-export interface ConversationTurn {
-  timestamp: Date;
+export interface LogTurn {
   role: 'user' | 'agent' | 'system';
   text: string;
   isFinal: boolean;
-  toolUseRequest?: LiveServerToolCall;
+  timestamp: Date;
   audioData?: Uint8Array;
 }
 
 export const useLogStore = create<{
-  turns: ConversationTurn[];
-  addTurn: (turn: Omit<ConversationTurn, 'timestamp'>) => void;
-  updateLastTurn: (update: Partial<ConversationTurn>) => void;
-  clearTurns: () => void;
-}>((set) => ({
+  turns: LogTurn[];
+  addTurn: (turn: Omit<LogTurn, 'timestamp'>) => void;
+  updateLastTurn: (update: Partial<LogTurn>) => void;
+  clear: () => void;
+}>(set => ({
   turns: [],
-  addTurn: (turn) => set(state => ({ turns: [...state.turns, { ...turn, timestamp: new Date() }] })),
-  updateLastTurn: (update) => set(state => {
-    if (state.turns.length === 0) return state;
-    const newTurns = [...state.turns];
-    const lastIndex = newTurns.length - 1;
-    newTurns[lastIndex] = { ...newTurns[lastIndex], ...update };
-    return { turns: newTurns };
+  addTurn: turn => set(state => ({
+    turns: [...state.turns, { ...turn, timestamp: new Date() }]
+  })),
+  updateLastTurn: update => set(state => {
+    const turns = [...state.turns];
+    if (turns.length > 0) {
+      turns[turns.length - 1] = { ...turns[turns.length - 1], ...update };
+    }
+    return { turns };
   }),
-  clearTurns: () => set({ turns: [] }),
+  clear: () => set({ turns: [] })
 }));

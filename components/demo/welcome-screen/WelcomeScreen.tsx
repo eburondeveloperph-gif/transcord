@@ -66,7 +66,6 @@ const getContent = (template: Template) => {
       description: 'Traduction précise en français de Côte d’Ivoire (Nouchi).',
       prompts: ["C'est comment ?", "On est ensemble.", "Ça va aller."],
     },
-    // ... Add other specific ones if needed, otherwise fallback to generated
   };
 
   if (template in specificContent) {
@@ -97,16 +96,27 @@ const WelcomeScreen: React.FC = () => {
   const { connect, client, connected } = useLiveAPIContext();
   const current = getContent(template);
 
-  const handleLaunch = () => {
+  const handleLaunch = async () => {
     if (!connected) {
+      // Check for custom API key if the environment supports/requires it
+      if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        if (!hasKey) {
+          await window.aistudio.openSelectKey();
+          // Proceeding assuming selection was successful per guidelines
+        }
+      }
       connect().catch(console.error);
     }
   };
 
-  const handlePromptClick = (text: string) => {
+  const handlePromptClick = async (text: string) => {
     if (!connected) {
+      if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        if (!hasKey) await window.aistudio.openSelectKey();
+      }
       connect().then(() => {
-        // Short delay to ensure setup completion before sending text
         setTimeout(() => {
           client.send([{ text }], true);
         }, 100);

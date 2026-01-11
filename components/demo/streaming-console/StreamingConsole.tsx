@@ -15,33 +15,6 @@ import {
   useTools,
 } from '../../../lib/state';
 
-const formatTimestamp = (date: Date) => {
-  const pad = (num: number, size = 2) => num.toString().padStart(size, '0');
-  const hours = pad(date.getHours());
-  const minutes = pad(date.getMinutes());
-  return `${hours}:${minutes}`;
-};
-
-const formatDuration = (seconds: number) => {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-};
-
-const renderContent = (text: string) => {
-  const boldParts = text.split(/(\*\*.*?\*\*)/g);
-  return boldParts.map((boldPart, boldIndex) => {
-    if (boldPart.startsWith('**') && boldPart.endsWith('**')) {
-      return <strong key={boldIndex}>{boldPart.slice(2, -2)}</strong>;
-    }
-    return boldPart;
-  });
-};
-
-/**
- * Component for message playback controls (Play, Pause, Stop).
- * Enhanced with progress tracking and duration display.
- */
 const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
   const [status, setStatus] = useState<'playing' | 'paused' | 'stopped'>('stopped');
   const [progress, setProgress] = useState(0);
@@ -51,7 +24,6 @@ const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
   const bufferRef = useRef<AudioBuffer | null>(null);
   const progressIntervalRef = useRef<number | null>(null);
 
-  // PCM16: 2 bytes per sample, 24000 samples per second
   const duration = useMemo(() => audioData.length / 2 / 24000, [audioData]);
 
   const initBuffer = async () => {
@@ -73,26 +45,20 @@ const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
     const ctx = await audioContext({ id: 'playback' });
     if (ctx.state === 'suspended') await ctx.resume();
     const buffer = await initBuffer();
-
     if (status === 'playing') return;
-
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(ctx.destination);
-    
     const offset = status === 'paused' ? pausedAtRef.current : 0;
     source.start(0, offset);
     startTimeRef.current = ctx.currentTime - offset;
     sourceRef.current = source;
-    
     setStatus('playing');
-
     progressIntervalRef.current = window.setInterval(() => {
       const current = ctx.currentTime - startTimeRef.current;
       const percent = Math.min(100, (current / duration) * 100);
       setProgress(percent);
     }, 50);
-
     source.onended = () => {
       if (sourceRef.current === source) {
         setStatus('stopped');
@@ -135,7 +101,7 @@ const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
   }, []);
 
   return (
-    <div className="playback-controls-wrapper">
+    <div className="playback-controls-wrapper zen-mode">
       <div className="playback-controls">
         {status !== 'playing' ? (
           <button className="playback-btn" onClick={handlePlay} title="Play interpretation">
@@ -149,15 +115,9 @@ const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
         <button className="playback-btn" onClick={handleStop} disabled={status === 'stopped'} title="Stop">
           <span className="material-symbols-outlined">stop</span>
         </button>
-        
         <div className="playback-progress-container">
           <div className="playback-progress-track">
             <div className="playback-progress-fill" style={{ width: `${progress}%` }} />
-          </div>
-          <div className="playback-duration">
-            {status === 'playing' || status === 'paused' 
-              ? formatDuration(pausedAtRef.current || (progress / 100 * duration))
-              : formatDuration(duration)}
           </div>
         </div>
       </div>
@@ -166,15 +126,14 @@ const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
 });
 
 export default function StreamingConsole() {
-  const { client, setConfig, connected, connect } = useLiveAPIContext();
+  const { client, setConfig, connected, connect, isAiSpeaking } = useLiveAPIContext();
   const { systemPrompt, voice } = useSettings();
   const { tools } = useTools();
   const turns = useLogStore(state => state.turns);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const [chatValue, setChatValue] = useState('');
-  
-  // Local ref to accumulate audio chunks for the current turn
+  const [activeSubtitle, setActiveSubtitle] = useState<string | null>(null);
   const currentAudioChunks = useRef<Uint8Array[]>([]);
+  const subtitleTimeoutRef = useRef<number | null>(null);
 
   const handleSendMessage = (text?: string) => {
     const messageText = text || chatValue.trim();
@@ -191,103 +150,55 @@ export default function StreamingConsole() {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleSendMessage();
+  useEffect(() => {
+    if (subtitleTimeoutRef.current) window.clearTimeout(subtitleTimeoutRef.current);
+    if (!isAiSpeaking && activeSubtitle) {
+      subtitleTimeoutRef.current = window.setTimeout(() => {
+        setActiveSubtitle(null);
+      }, 3000);
     }
-  };
+  }, [isAiSpeaking, activeSubtitle]);
 
-  // Database/WebSocket Integration
   useEffect(() => {
     const handleRemoteMessage = (text: string) => {
       if (text && text.trim()) {
         handleSendMessage(text.trim());
-        useLogStore.getState().addTurn({
-          role: 'system',
-          text: `📥 Stream Input: "${text}"`,
-          isFinal: true
-        });
       }
     };
-
     wsService.on('message', handleRemoteMessage);
     wsService.connect();
-
-    return () => {
-      wsService.off('message', handleRemoteMessage);
-    };
+    return () => wsService.off('message', handleRemoteMessage);
   }, [connected, client]);
 
   useEffect(() => {
-    const declarations = tools
-      .filter(tool => tool.isEnabled)
-      .map(tool => ({
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.parameters,
-      }));
-
-    // Simplified config to resolve "Operation not implemented" error
-    // Removing transcriptions and using a string for systemInstruction
     const config: LiveConnectConfig = {
       responseModalities: [Modality.AUDIO],
       speechConfig: {
         voiceConfig: {
-          prebuiltVoiceConfig: {
-            voiceName: voice,
-          },
+          prebuiltVoiceConfig: { voiceName: voice },
         },
       },
-      systemInstruction: systemPrompt,
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      tools: [{ functionDeclarations: tools.filter(t => t.isEnabled).map(t => ({
+        name: t.name,
+        description: t.description,
+        parameters: t.parameters
+      })) }]
     };
-
-    if (declarations.length > 0) {
-      config.tools = [{ functionDeclarations: declarations }];
-    }
-
     setConfig(config);
   }, [setConfig, systemPrompt, tools, voice]);
 
   useEffect(() => {
     const { addTurn, updateLastTurn } = useLogStore.getState();
 
-    const handleInputTranscription = (text: string, isFinal: boolean) => {
-      const turns = useLogStore.getState().turns;
-      const last = turns[turns.length - 1];
-      if (last && last.role === 'user' && !last.isFinal) {
-        updateLastTurn({ text: text, isFinal });
-      } else {
-        addTurn({ role: 'user', text, isFinal });
-      }
-    };
-
-    const handleOutputTranscription = (text: string, isFinal: boolean) => {
-      const turns = useLogStore.getState().turns;
-      const last = turns[turns.length - 1];
-      if (last && last.role === 'agent' && !last.isFinal) {
-        updateLastTurn({ text: text, isFinal });
-      } else {
-        addTurn({ role: 'agent', text, isFinal });
-      }
-    };
-
     const handleContent = (serverContent: LiveServerContent) => {
-      const text =
-        serverContent.modelTurn?.parts
+      const text = serverContent.modelTurn?.parts
           ?.map((p: any) => p.text)
           .filter(Boolean)
           .join(' ') ?? '';
-      
       if (!text) return;
-
-      const turns = useLogStore.getState().turns;
-      const last = turns.at(-1);
-
-      if (last?.role === 'agent' && !last.isFinal) {
-        updateLastTurn({ text: last.text + text });
-      } else {
-        addTurn({ role: 'agent', text, isFinal: false });
-      }
+      setActiveSubtitle(text);
+      addTurn({ role: 'agent', text, isFinal: false });
     };
 
     const handleTurnComplete = () => {
@@ -306,8 +217,6 @@ export default function StreamingConsole() {
         } else if (!last.isFinal) {
           updateLastTurn({ isFinal: true });
         }
-      } else if (last && !last.isFinal) {
-        updateLastTurn({ isFinal: true });
       }
     };
 
@@ -315,78 +224,51 @@ export default function StreamingConsole() {
       currentAudioChunks.current.push(new Uint8Array(data));
     };
 
-    client.on('inputTranscription', handleInputTranscription);
-    client.on('outputTranscription', handleOutputTranscription);
     client.on('content', handleContent);
     client.on('turncomplete', handleTurnComplete);
     client.on('audio', onAudio);
 
     return () => {
-      client.off('inputTranscription', handleInputTranscription);
-      client.off('outputTranscription', handleOutputTranscription);
       client.off('content', handleContent);
       client.off('turncomplete', handleTurnComplete);
       client.off('audio', onAudio);
     };
   }, [client]);
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: 'smooth'
-      });
-    }
-  }, [turns]);
+  const lastAgentTurn = turns.filter(t => t.role === 'agent' && t.audioData).at(-1);
 
   return (
-    <div className="transcription-container">
-      {turns.length === 0 ? (
+    <div className="transcription-container zen-ui">
+      {turns.length === 0 && !connected ? (
         <WelcomeScreen />
       ) : (
-        <div className="transcription-view" ref={scrollRef}>
-          {turns.filter(t => t.role !== 'system').map((t, i) => (
-            <div
-              key={i}
-              className={`transcription-entry ${t.role} ${!t.isFinal ? 'interim' : ''}`}
-            >
-              <div className="transcription-header">
-                <div className="transcription-source">
-                  {t.role === 'user' ? 'You' : t.role === 'agent' ? 'Translator' : 'System'}
-                </div>
-                <div className="transcription-timestamp">
-                  {formatTimestamp(t.timestamp)}
-                </div>
-              </div>
-              <div className="transcription-text-content">
-                {renderContent(t.text)}
-              </div>
-              
-              {t.role === 'agent' && t.audioData && (
-                <PlaybackControls audioData={t.audioData} />
-              )}
-            </div>
-          ))}
+        <div className="audio-zen-center">
+          <div className={`audio-pulse ${isAiSpeaking ? 'active' : ''}`}>
+            <div className="pulse-ring"></div>
+            <span className="material-symbols-outlined audio-icon">
+              {isAiSpeaking ? 'graphic_eq' : 'mic_none'}
+            </span>
+          </div>
+          
+          <div className={`zen-subtitle ${activeSubtitle ? 'visible' : ''}`}>
+            {activeSubtitle}
+          </div>
+
+          {lastAgentTurn?.audioData && (
+             <PlaybackControls audioData={lastAgentTurn.audioData} />
+          )}
         </div>
       )}
-      
-      {/* Hidden but accessible chat input for fallback/testing */}
-      <div className="chat-composer-inline">
+
+      <div className="chat-composer-zen">
         <input
           type="text"
           className="chat-composer-input"
-          placeholder="Type a message..."
+          placeholder="Input text..."
           value={chatValue}
           onChange={(e) => setChatValue(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
         />
-        <button 
-          className="chat-composer-submit" 
-          onClick={() => handleSendMessage()}
-          disabled={!chatValue.trim()}
-        >
-          <span className="material-symbols-outlined">send</span>
-        </button>
       </div>
     </div>
   );
