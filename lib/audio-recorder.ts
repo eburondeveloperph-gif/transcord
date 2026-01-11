@@ -93,14 +93,11 @@ export class AudioRecorder {
     }
 
     // 3. Adaptive Noise Floor Tracking
-    // Only update floor when not speaking or during very low energy
     const isBackground = smoothVolume < (this.noiseFloor * 1.5);
     const noiseAlpha = isBackground ? 0.05 : 0.001; 
     this.noiseFloor = this.noiseFloor * (1 - noiseAlpha) + Math.max(0.001, smoothVolume) * noiseAlpha;
 
     // 4. Dynamic SNR-Based Thresholding
-    // We adjust the 'trigger gap' based on how loud the room is.
-    // In a loud room (higher noiseFloor), we need a larger gap to avoid false positives.
     const noiseFactor = Math.min(2.5, Math.max(1.0, this.noiseFloor * 150));
     const START_THRESHOLD = this.noiseFloor * (2.8 * noiseFactor) + 0.01; 
     const STOP_THRESHOLD = this.noiseFloor * (1.4 * noiseFactor) + 0.005;
@@ -112,8 +109,7 @@ export class AudioRecorder {
     } else if (this.isSpeaking) {
       if (smoothVolume < STOP_THRESHOLD) {
         this.silenceFrames++;
-        // Hold-time (hangover) to prevent cutting off sentence endings
-        if (this.silenceFrames > 25) { // ~600ms at 25fps update rate
+        if (this.silenceFrames > 25) { 
           this.isSpeaking = false;
         }
       } else {
@@ -122,26 +118,25 @@ export class AudioRecorder {
     }
 
     // 6. Proportional Gain Control
-    // Aim for a target RMS level but don't boost noise too much
     const TARGET_LEVEL = 0.45;
     const MAX_BOOST = 12.0; 
     
     if (this.isSpeaking) {
-      // Signal Gain: Boost to target, limited by MAX_BOOST
       const neededBoost = TARGET_LEVEL / Math.max(0.005, smoothVolume);
       this.targetGain = Math.min(MAX_BOOST, neededBoost);
     } else {
-      // Silence Gain: Aggressive suppression of background noise
       this.targetGain = 0.01; 
     }
 
     // 7. Non-Linear Gain Smoothing
-    // Fast attack to catch first sounds, slow release for natural flow
     const gainAlpha = this.targetGain > this.currentGain ? 0.45 : 0.12;
     this.currentGain = this.currentGain * (1 - gainAlpha) + this.targetGain * gainAlpha;
     
-    // Smooth Ducking integration
-    const duckingAlpha = 0.2;
+    // 8. Refined Asymmetric Ducking Logic
+    // Ducking needs to be fast (attack) to prevent feedback loops, 
+    // but restoration should be subtle and smooth (release).
+    const isDucking = this.targetVolumeMultiplier < this.volumeMultiplier;
+    const duckingAlpha = isDucking ? 0.35 : 0.06; // Faster attack (0.35), slower release (0.06)
     this.volumeMultiplier = this.volumeMultiplier * (1 - duckingAlpha) + this.targetVolumeMultiplier * duckingAlpha;
 
     const finalGain = this.currentGain * this.volumeMultiplier;
@@ -162,7 +157,7 @@ export class AudioRecorder {
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
-            autoGainControl: false, // Explicitly false so we can handle it digitally
+            autoGainControl: false, 
             channelCount: 1,
             sampleRate: this.sampleRate
           } 
@@ -202,7 +197,7 @@ export class AudioRecorder {
 
         this.source.connect(this.vuWorklet);
         this.recording = true;
-        this.calibrationFrames = 20; // Reset calibration on every start
+        this.calibrationFrames = 20; 
         resolve();
         this.starting = null;
       } catch (err) {

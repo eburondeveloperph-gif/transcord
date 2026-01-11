@@ -60,19 +60,23 @@ export function useLiveApi({
   const [volume, setVolume] = useState(0);
   const [connected, setConnected] = useState(false);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
-  const [config, setConfig] = useState<LiveConnectConfig>({});
+  const [config, setConfig] = useState<LiveConnectConfig>({
+    inputAudioTranscription: {}, // Always enable transcription for seamless Rec/Trans flow
+  });
 
   // Monitor config changes to potentially restart session
-  // This allows "dynamic" setting of language/voice even when already online
   const prevConfigRef = useRef<string>("");
   useEffect(() => {
-    const configStr = JSON.stringify(config);
+    const configWithTranscription = {
+      ...config,
+      inputAudioTranscription: {},
+    };
+    const configStr = JSON.stringify(configWithTranscription);
     if (connected && prevConfigRef.current && prevConfigRef.current !== configStr) {
       console.log("Configuration changed while connected. Restarting session to apply...");
       client.disconnect();
-      // Brief delay to ensure closure then reconnect with new config
       setTimeout(() => {
-        client.connect(config).catch(err => console.error("Reconnect failed after config change:", err));
+        client.connect(configWithTranscription).catch(err => console.error("Reconnect failed after config change:", err));
       }, 500);
     }
     prevConfigRef.current = configStr;
@@ -91,16 +95,12 @@ export function useLiveApi({
         const streamer = new AudioStreamer(audioCtx);
         audioStreamerRef.current = streamer;
         
-        // Setup state listeners for AI speaking status
         streamer.onPlay = () => setIsAiSpeaking(true);
         streamer.onStop = () => setIsAiSpeaking(false);
 
         streamer
           .addWorklet<any>('vumeter-out', VolMeterWorket, (ev: any) => {
             setVolume(ev.data.volume);
-          })
-          .then(() => {
-            // Successfully added worklet
           })
           .catch(err => {
             console.error('Error adding worklet:', err);
@@ -120,9 +120,7 @@ export function useLiveApi({
       isConnectingRef.current = false;
     };
 
-    const stopAudioStreamer = () => {
-      // We explicitly DO NOT stop the audio streamer on interruption
-    };
+    const stopAudioStreamer = () => {};
 
     const onAudio = (data: ArrayBuffer) => {
       if (audioStreamerRef.current) {
@@ -135,7 +133,6 @@ export function useLiveApi({
       isConnectingRef.current = false;
     };
 
-    // Bind event listeners
     client.on('open', onOpen);
     client.on('close', onClose);
     client.on('error', onError);
@@ -146,7 +143,6 @@ export function useLiveApi({
       const functionResponses: any[] = [];
 
       for (const fc of toolCall.functionCalls) {
-        // Special Handling for WebSocket Broadcasting
         if (fc.name === 'broadcast_to_websocket') {
           const text = (fc.args as any).text;
           const success = wsService.sendPrompt(text);
@@ -158,7 +154,6 @@ export function useLiveApi({
           continue;
         }
 
-        // Generic Logging for other tools
         const triggerMessage = `Triggering function call: **${
           fc.name
         }**\n\`\`\`json\n${JSON.stringify(fc.args, null, 2)}\n\`\`\``;
@@ -181,7 +176,6 @@ export function useLiveApi({
     client.on('toolcall', onToolCall);
 
     return () => {
-      // Clean up event listeners
       client.off('open', onOpen);
       client.off('close', onClose);
       client.off('error', onError);
@@ -194,12 +188,10 @@ export function useLiveApi({
   const connect = useCallback(async () => {
     if (connected) return;
     
-    // Return existing promise if a connection attempt is already in progress
     if (isConnectingRef.current && connectionPromiseRef.current) {
       return connectionPromiseRef.current;
     }
 
-    // Wait until we have a configuration before attempting to connect
     if (!config || Object.keys(config).length === 0) {
       console.warn('LiveAPIContext: Attempted connect without config. Aborting.');
       return;
@@ -209,7 +201,10 @@ export function useLiveApi({
     
     const connectTask = async () => {
         try {
-          const success = await client.connect(config);
+          const success = await client.connect({
+            ...config,
+            inputAudioTranscription: {},
+          });
           if (!success) {
             throw new Error('WebSocket connection could not be established.');
           }

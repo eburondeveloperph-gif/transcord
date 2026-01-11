@@ -18,26 +18,28 @@ export default function Header() {
   }, []);
 
   return (
-    <header>
+    <header className="header-glass">
       <div className="header-left">
-        <h1>Super Translator</h1>
-      </div>
-      <div className="header-right">
-        <div 
-          className={cn('ws-indicator', wsStatus)} 
-          aria-label={`Remote status: ${wsStatus}`}
-          title={`WebSocket Status: ${wsStatus}`}
-        >
-          <span className={cn('material-symbols-outlined', { 'filled': wsStatus === 'connected' })}>
-            {wsStatus === 'connected' ? 'sensors' : wsStatus === 'connecting' ? 'hourglass_top' : 'sensors_off'}
-          </span>
+        <div className="logo-group">
+          <span className="material-symbols-outlined logo-icon">auto_awesome</span>
+          <h1>Super</h1>
         </div>
+      </div>
+
+      <div className="header-center">
+        <div className="status-pill">
+          <span className="status-dot"></span>
+          <span className="status-text">AI Live Flow</span>
+        </div>
+      </div>
+
+      <div className="header-right">
         <button
           className="settings-button"
           onClick={toggleSidebar}
           aria-label="Settings"
         >
-          <span className="material-symbols-outlined">settings</span>
+          <span className="material-symbols-outlined">tune</span>
         </button>
       </div>
     </header>

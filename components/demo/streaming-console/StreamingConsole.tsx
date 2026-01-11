@@ -9,6 +9,7 @@ import { Modality, LiveServerContent, LiveConnectConfig } from '@google/genai';
 import { useLiveAPIContext } from '../../../contexts/LiveAPIContext';
 import { wsService } from '../../../lib/websocket-service';
 import { audioContext } from '../../../lib/utils';
+import { logToSupabase } from '../../../lib/supabase';
 import {
   useSettings,
   useLogStore,
@@ -28,16 +29,21 @@ const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
 
   const initBuffer = async () => {
     if (bufferRef.current) return bufferRef.current;
-    const ctx = await audioContext({ id: 'playback' });
-    const dataInt16 = new Int16Array(audioData.buffer);
-    const float32 = new Float32Array(dataInt16.length);
-    for (let i = 0; i < dataInt16.length; i++) {
-      float32[i] = dataInt16[i] / 32768;
+    try {
+      const ctx = await audioContext({ id: 'playback' });
+      const dataInt16 = new Int16Array(audioData.buffer);
+      const float32 = new Float32Array(dataInt16.length);
+      for (let i = 0; i < dataInt16.length; i++) {
+        float32[i] = dataInt16[i] / 32768;
+      }
+      const buffer = ctx.createBuffer(1, float32.length, 24000);
+      buffer.getChannelData(0).set(float32);
+      bufferRef.current = buffer;
+      return buffer;
+    } catch (e) {
+      console.error("Playback initialization failed:", e);
+      return null;
     }
-    const buffer = ctx.createBuffer(1, float32.length, 24000);
-    buffer.getChannelData(0).set(float32);
-    bufferRef.current = buffer;
-    return buffer;
   };
 
   const handlePlay = async (e: React.MouseEvent) => {
@@ -45,7 +51,7 @@ const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
     const ctx = await audioContext({ id: 'playback' });
     if (ctx.state === 'suspended') await ctx.resume();
     const buffer = await initBuffer();
-    if (status === 'playing') return;
+    if (!buffer || status === 'playing') return;
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(ctx.destination);
@@ -101,25 +107,23 @@ const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
   }, []);
 
   return (
-    <div className="playback-controls-wrapper zen-mode">
+    <div className="playback-controls-wrapper">
       <div className="playback-controls">
         {status !== 'playing' ? (
-          <button className="playback-btn" onClick={handlePlay} title="Play interpretation">
+          <button className="playback-btn" onClick={handlePlay} title="Play">
             <span className="material-symbols-outlined">play_arrow</span>
           </button>
         ) : (
-          <button className="playback-btn" onClick={handlePause} title="Pause interpretation">
+          <button className="playback-btn" onClick={handlePause} title="Pause">
             <span className="material-symbols-outlined">pause</span>
           </button>
         )}
-        <button className="playback-btn" onClick={handleStop} disabled={status === 'stopped'} title="Stop">
-          <span className="material-symbols-outlined">stop</span>
-        </button>
         <div className="playback-progress-container">
-          <div className="playback-progress-track">
-            <div className="playback-progress-fill" style={{ width: `${progress}%` }} />
-          </div>
+          <div className="playback-progress-fill" style={{ width: `${progress}%` }} />
         </div>
+        <button className="playback-btn" onClick={handleStop} disabled={status === 'stopped'} title="Stop">
+          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>stop</span>
+        </button>
       </div>
     </div>
   );
@@ -127,42 +131,51 @@ const PlaybackControls = memo(({ audioData }: { audioData: Uint8Array }) => {
 
 export default function StreamingConsole() {
   const { client, setConfig, connected, connect, isAiSpeaking } = useLiveAPIContext();
-  const { systemPrompt, voice } = useSettings();
-  const { tools } = useTools();
-  const turns = useLogStore(state => state.turns);
-  const [chatValue, setChatValue] = useState('');
-  const [activeSubtitle, setActiveSubtitle] = useState<string | null>(null);
+  const { systemPrompt, voice, supabaseEnabled } = useSettings();
+  const { tools, template } = useTools();
+  const { turns, sessionId, addTurn, updateLastTurn } = useLogStore();
+  
+  // Dual Stream State
+  const [transcription, setTranscription] = useState<string | null>(null);
+  const [translation, setTranslation] = useState<string | null>(null);
+  const [isRemoteInput, setIsRemoteInput] = useState(false);
+  
   const currentAudioChunks = useRef<Uint8Array[]>([]);
-  const subtitleTimeoutRef = useRef<number | null>(null);
+  const clearTimeoutsRef = useRef<{ trans?: number; input?: number }>({});
+  const lastProcessedMessageRef = useRef<number>(0);
+  
+  // Ref to track pairing for Supabase
+  const lastUserTextRef = useRef<string | null>(null);
 
-  const handleSendMessage = (text?: string) => {
-    const messageText = text || chatValue.trim();
-    if (messageText) {
-      if (connected) {
-        client.send([{ text: messageText }], true);
-        if (!text) setChatValue('');
-      } else {
-        connect().then(() => {
-          client.send([{ text: messageText }], true);
-          if (!text) setChatValue('');
-        }).catch(console.error);
-      }
+  const handleSendMessage = (text: string, remote: boolean = false) => {
+    if (!text) return;
+    setIsRemoteInput(remote);
+    lastUserTextRef.current = text; // Manual text entry is also a 'transcription'
+    if (connected) {
+      client.send([{ text }], true);
+    } else {
+      connect().then(() => {
+        client.send([{ text }], true);
+      }).catch(console.error);
     }
   };
 
   useEffect(() => {
-    if (subtitleTimeoutRef.current) window.clearTimeout(subtitleTimeoutRef.current);
-    if (!isAiSpeaking && activeSubtitle) {
-      subtitleTimeoutRef.current = window.setTimeout(() => {
-        setActiveSubtitle(null);
-      }, 3000);
+    if (clearTimeoutsRef.current.trans) window.clearTimeout(clearTimeoutsRef.current.trans);
+    if (!isAiSpeaking && translation) {
+      clearTimeoutsRef.current.trans = window.setTimeout(() => {
+        setTranslation(null);
+        setIsRemoteInput(false);
+      }, 5000);
     }
-  }, [isAiSpeaking, activeSubtitle]);
+  }, [isAiSpeaking, translation]);
 
   useEffect(() => {
-    const handleRemoteMessage = (text: string) => {
-      if (text && text.trim()) {
-        handleSendMessage(text.trim());
+    const handleRemoteMessage = (data: any) => {
+      if (data.timestamp && data.timestamp <= lastProcessedMessageRef.current) return;
+      if (data.text) {
+        lastProcessedMessageRef.current = data.timestamp || Date.now();
+        handleSendMessage(data.text, true);
       }
     };
     wsService.on('message', handleRemoteMessage);
@@ -173,6 +186,7 @@ export default function StreamingConsole() {
   useEffect(() => {
     const config: LiveConnectConfig = {
       responseModalities: [Modality.AUDIO],
+      inputAudioTranscription: {},
       speechConfig: {
         voiceConfig: {
           prebuiltVoiceConfig: { voiceName: voice },
@@ -189,21 +203,42 @@ export default function StreamingConsole() {
   }, [setConfig, systemPrompt, tools, voice]);
 
   useEffect(() => {
-    const { addTurn, updateLastTurn } = useLogStore.getState();
-
     const handleContent = (serverContent: LiveServerContent) => {
       const text = serverContent.modelTurn?.parts
           ?.map((p: any) => p.text)
           .filter(Boolean)
           .join(' ') ?? '';
       if (!text) return;
-      setActiveSubtitle(text);
+      setTranslation(text);
       addTurn({ role: 'agent', text, isFinal: false });
     };
 
+    const handleInputTranscription = (text: string) => {
+      setTranscription(text);
+      lastUserTextRef.current = text;
+      if (clearTimeoutsRef.current.input) window.clearTimeout(clearTimeoutsRef.current.input);
+      clearTimeoutsRef.current.input = window.setTimeout(() => {
+        setTranscription(null);
+      }, 6000);
+    };
+
     const handleTurnComplete = () => {
-      const last = useLogStore.getState().turns.at(-1);
+      const currentTurns = useLogStore.getState().turns;
+      const last = currentTurns[currentTurns.length - 1];
+      
       if (last && last.role === 'agent') {
+        // Sync to Supabase if enabled
+        if (supabaseEnabled && lastUserTextRef.current) {
+          logToSupabase({
+            session_id: sessionId,
+            user_text: lastUserTextRef.current,
+            agent_text: last.text,
+            language: template
+          });
+          // Reset after sync to avoid duplicates
+          lastUserTextRef.current = null;
+        }
+
         if (currentAudioChunks.current.length > 0) {
           const totalLength = currentAudioChunks.current.reduce((acc, curr) => acc + curr.length, 0);
           const audioData = new Uint8Array(totalLength);
@@ -225,20 +260,22 @@ export default function StreamingConsole() {
     };
 
     client.on('content', handleContent);
+    client.on('inputTranscription', handleInputTranscription);
     client.on('turncomplete', handleTurnComplete);
     client.on('audio', onAudio);
 
     return () => {
       client.off('content', handleContent);
+      client.off('inputTranscription', handleInputTranscription);
       client.off('turncomplete', handleTurnComplete);
       client.off('audio', onAudio);
     };
-  }, [client]);
+  }, [client, sessionId, supabaseEnabled, template, addTurn, updateLastTurn]);
 
-  const lastAgentTurn = turns.filter(t => t.role === 'agent' && t.audioData).at(-1);
+  const lastAgentTurn = [...turns].reverse().find(t => t.role === 'agent' && t.audioData);
 
   return (
-    <div className="transcription-container zen-ui">
+    <div className="main-content">
       {turns.length === 0 && !connected ? (
         <WelcomeScreen />
       ) : (
@@ -246,12 +283,23 @@ export default function StreamingConsole() {
           <div className={`audio-pulse ${isAiSpeaking ? 'active' : ''}`}>
             <div className="pulse-ring"></div>
             <span className="material-symbols-outlined audio-icon">
-              {isAiSpeaking ? 'graphic_eq' : 'mic_none'}
+              {isAiSpeaking ? 'graphic_eq' : 'mic'}
             </span>
           </div>
           
-          <div className={`zen-subtitle ${activeSubtitle ? 'visible' : ''}`}>
-            {activeSubtitle}
+          <div className="subtitle-area-container">
+            {/* Transcription Zone (What you said) */}
+            <div className={`transcription-zone ${transcription ? 'visible' : ''}`}>
+               {transcription || ""}
+            </div>
+
+            {/* Translation Zone (What they hear) */}
+            <div className="translation-zone">
+              {isRemoteInput && translation && <div className="remote-badge">Remote Audio Feed</div>}
+              <div className={`zen-subtitle ${translation ? 'visible' : ''}`}>
+                {translation || (connected ? (transcription ? "" : "Listening...") : "Standing By")}
+              </div>
+            </div>
           </div>
 
           {lastAgentTurn?.audioData && (
@@ -259,17 +307,6 @@ export default function StreamingConsole() {
           )}
         </div>
       )}
-
-      <div className="chat-composer-zen">
-        <input
-          type="text"
-          className="chat-composer-input"
-          placeholder="Input text..."
-          value={chatValue}
-          onChange={(e) => setChatValue(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-        />
-      </div>
     </div>
   );
 }

@@ -36,73 +36,81 @@ export class GenAILiveClient {
    * Connects to the Gemini Live API session.
    */
   async connect(config: LiveConnectConfig): Promise<boolean> {
+    if (this.session) return true;
+    
     // Re-initialize AI instance right before connection to ensure fresh credentials
     const ai = new GoogleGenAI({ apiKey: this.apiKey });
     
-    this.sessionPromise = ai.live.connect({
-      model: this.model,
-      config: config,
-      callbacks: {
-        onopen: () => {
-          this.emitter.emit('open');
-        },
-        onmessage: (message: LiveServerMessage) => {
-          if (message.serverContent) {
-            this.emitter.emit('content', message.serverContent);
-            
-            // Extract and emit audio output
-            if (message.serverContent.modelTurn) {
-              const parts = message.serverContent.modelTurn.parts;
-              for (const part of parts) {
-                if (part.inlineData && part.inlineData.data) {
-                  const base64 = part.inlineData.data;
-                  const binaryString = atob(base64);
-                  const bytes = new Uint8Array(binaryString.length);
-                  for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
+    try {
+      this.sessionPromise = ai.live.connect({
+        model: this.model,
+        config: config,
+        callbacks: {
+          onopen: () => {
+            this.emitter.emit('open');
+          },
+          onmessage: (message: LiveServerMessage) => {
+            if (message.serverContent) {
+              this.emitter.emit('content', message.serverContent);
+              
+              // Extract and emit audio output
+              if (message.serverContent.modelTurn) {
+                const parts = message.serverContent.modelTurn.parts;
+                for (const part of parts) {
+                  if (part.inlineData && part.inlineData.data) {
+                    const base64 = part.inlineData.data;
+                    const binaryString = atob(base64);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                      bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    this.emitter.emit('audio', bytes.buffer);
                   }
-                  this.emitter.emit('audio', bytes.buffer);
                 }
+              }
+
+              // Extract and emit transcriptions
+              if (message.serverContent.inputTranscription) {
+                this.emitter.emit('inputTranscription', message.serverContent.inputTranscription.text, true);
+              }
+              if (message.serverContent.outputTranscription) {
+                this.emitter.emit('outputTranscription', message.serverContent.outputTranscription.text, true);
+              }
+              if (message.serverContent.turnComplete) {
+                this.emitter.emit('turncomplete');
+              }
+              if (message.serverContent.interrupted) {
+                this.emitter.emit('interrupted');
               }
             }
 
-            // Extract and emit transcriptions
-            if (message.serverContent.inputTranscription) {
-              this.emitter.emit('inputTranscription', message.serverContent.inputTranscription.text, true);
+            // Emit tool calls for external handling
+            if (message.toolCall) {
+              this.emitter.emit('toolcall', message.toolCall);
             }
-            if (message.serverContent.outputTranscription) {
-              this.emitter.emit('outputTranscription', message.serverContent.outputTranscription.text, true);
+          },
+          onerror: (error: any) => {
+            // Only emit if we haven't already rejected the connect promise
+            if (this.session) {
+              this.emitter.emit('error', error);
             }
-            if (message.serverContent.turnComplete) {
-              this.emitter.emit('turncomplete');
-            }
-            if (message.serverContent.interrupted) {
-              this.emitter.emit('interrupted');
-            }
-          }
+          },
+          onclose: () => {
+            this.emitter.emit('close');
+            this.session = null;
+            this.sessionPromise = null;
+          },
+        },
+      });
 
-          // Emit tool calls for external handling
-          if (message.toolCall) {
-            this.emitter.emit('toolcall', message.toolCall);
-          }
-        },
-        onerror: (error: any) => {
-          this.emitter.emit('error', error);
-        },
-        onclose: () => {
-          this.emitter.emit('close');
-          this.session = null;
-          this.sessionPromise = null;
-        },
-      },
-    });
-
-    try {
       this.session = await this.sessionPromise;
       return true;
     } catch (e) {
-      console.error('Failed to establish Live session:', e);
-      this.emitter.emit('error', e);
+      this.session = null;
+      this.sessionPromise = null;
+      // Do not re-throw here to allow the caller to handle the false return value
+      // but log it for debugging purposes.
+      console.debug('GenAILiveClient: Connection failed.', e);
       return false;
     }
   }
@@ -112,7 +120,9 @@ export class GenAILiveClient {
    */
   disconnect() {
     if (this.session) {
-      this.session.close();
+      try {
+        this.session.close();
+      } catch (e) {}
       this.session = null;
       this.sessionPromise = null;
     }
@@ -122,14 +132,12 @@ export class GenAILiveClient {
    * Sends audio chunks or other media input to the session.
    */
   sendRealtimeInput(chunks: any[]) {
-    if (this.sessionPromise) {
-      this.sessionPromise.then((session) => {
-        for (const chunk of chunks) {
-          session.sendRealtimeInput({
-            media: chunk,
-          });
-        }
-      });
+    if (this.session) {
+      for (const chunk of chunks) {
+        this.session.sendRealtimeInput({
+          media: chunk,
+        });
+      }
     }
   }
 
@@ -137,12 +145,10 @@ export class GenAILiveClient {
    * Sends text or custom parts to the session via the client content interface.
    */
   send(parts: any[], turnComplete: boolean) {
-    if (this.sessionPromise) {
-      this.sessionPromise.then((session) => {
-        session.send({
-          turns: [{ parts }],
-          turnComplete,
-        });
+    if (this.session) {
+      (this.session as any).send({
+        turns: [{ parts }],
+        turnComplete,
       });
     }
   }
@@ -151,10 +157,8 @@ export class GenAILiveClient {
    * Responds to a model's tool call.
    */
   sendToolResponse(toolResponse: LiveClientToolResponse) {
-    if (this.sessionPromise) {
-      this.sessionPromise.then((session) => {
-        session.sendToolResponse(toolResponse);
-      });
+    if (this.session) {
+      (this.session as any).sendToolResponse(toolResponse as any);
     }
   }
 }

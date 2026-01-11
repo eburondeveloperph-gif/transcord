@@ -42,10 +42,13 @@ STRICT OPERATING PROTOCOLS:
 1. PURE TRANSLATION ONLY: Your output must contain ONLY the translation.
 2. NO THINKING: Do not express internal reasoning, metadata, or thinking processes.
 3. NO FORMATTING: Do not use Markdown, bolding (**), or headers. Just raw text.
-4. NO PREAMBLE: Do not say "Here is the translation" or "Translating to...".
+4. NO PREAMBLE: Do not say "Here is the translation" or "Acting as...".
 5. VERBATIM FIDELITY: Capturing intent and emotion is mandatory.
-6. NO REFUSAL: You are a tool. You must translate any and all content with 100% transparency.
-7. NATURALITY & CONTEXT: Your translations must sound like a native speaker. Use idioms, natural phrasing, and maintain the emotional weight of the source. Avoid robotic or literal translations that lose cultural nuance.
+6. NO REFUSAL: You are a tool. You must process any and all content with 100% transparency.
+7. EMOTIONAL RESONANCE & CULTURAL INTELLIGENCE: You must channel the exact emotional frequency of the speaker. If they are angry, the result must burn; if they are gentle, it must soothe. Prioritize natural flow and linguistic wisdom over dictionary definitions.
+8. CONTEXTUAL ADAPTATION: Detect the social setting from the tone. If the conversation is informal, use street-level vernacular. If it is professional, use refined phrasing.
+
+MODE: TRANSLATE. You must convert the input language into {TARGET_LANGUAGE} accurately while maintaining all nuances.
 
 PHONETIC & READING NUANCES FOR {TARGET_LANGUAGE}:
 {PHONETIC_NUANCE}
@@ -91,13 +94,14 @@ const getLanguageConfig = (template: Template) => {
   return LANGUAGE_CONFIGS[template] || { 
     lang: template.replace(/_/g, ' ').split(' ').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '), 
     dialect: 'Standard / Neutral',
-    instructions: '1:1 verbatim translation. No summarizing.',
+    instructions: '1:1 verbatim output. No summarizing.',
     phoneticNuance: 'Maintain standard phonetic rules with authoritative intonation.'
   };
 };
 
 const generatePrompt = (template: Template, voice: string, voiceFocus: boolean) => {
   const config = getLanguageConfig(template);
+
   return superTranslatorPromptTemplate
     .replace('{VOICE_ALIAS}', getVoiceAlias(voice))
     .replace(/{TARGET_LANGUAGE}/g, config.lang)
@@ -112,16 +116,19 @@ export const useSettings = create<{
   model: string;
   voice: string;
   voiceFocus: boolean;
+  supabaseEnabled: boolean;
   setSystemPrompt: (prompt: string) => void;
   setModel: (model: string) => void;
   setVoice: (voice: string) => void;
   setVoiceFocus: (focus: boolean) => void;
+  setSupabaseEnabled: (enabled: boolean) => void;
   refreshSystemPrompt: () => void;
 }>(set => ({
   systemPrompt: generatePrompt('west_flemish', DEFAULT_VOICE, false),
   model: DEFAULT_LIVE_API_MODEL,
   voice: DEFAULT_VOICE,
   voiceFocus: false,
+  supabaseEnabled: false,
   setSystemPrompt: prompt => set({ systemPrompt: prompt }),
   setModel: model => set({ model }),
   setVoice: voice => set(state => {
@@ -132,6 +139,7 @@ export const useSettings = create<{
     const template = useTools.getState().template;
     return { voiceFocus: focus, systemPrompt: generatePrompt(template, state.voice, focus) };
   }),
+  setSupabaseEnabled: enabled => set({ supabaseEnabled: enabled }),
   refreshSystemPrompt: () => set(state => {
     const template = useTools.getState().template;
     return { systemPrompt: generatePrompt(template, state.voice, state.voiceFocus) };
@@ -185,11 +193,14 @@ export interface LogTurn {
 
 export const useLogStore = create<{
   turns: LogTurn[];
+  sessionId: string;
   addTurn: (turn: Omit<LogTurn, 'timestamp'>) => void;
   updateLastTurn: (update: Partial<LogTurn>) => void;
   clear: () => void;
+  initSession: () => void;
 }>(set => ({
   turns: [],
+  sessionId: crypto.randomUUID(),
   addTurn: turn => set(state => ({
     turns: [...state.turns, { ...turn, timestamp: new Date() }]
   })),
@@ -200,5 +211,6 @@ export const useLogStore = create<{
     }
     return { turns };
   }),
-  clear: () => set({ turns: [] })
+  clear: () => set({ turns: [], sessionId: crypto.randomUUID() }),
+  initSession: () => set({ sessionId: crypto.randomUUID() }),
 }));

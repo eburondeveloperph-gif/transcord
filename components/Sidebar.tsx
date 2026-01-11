@@ -5,7 +5,7 @@
 */
 import { FunctionCall, useSettings, useUI, useTools, Template } from '../lib/state';
 import c from 'classnames';
-import { DEFAULT_LIVE_API_MODEL, AVAILABLE_VOICES } from '../lib/constants';
+import { AVAILABLE_VOICES } from '../lib/constants';
 import { useLiveAPIContext } from '../contexts/LiveAPIContext';
 import { useState, useMemo } from 'react';
 import ToolEditorModal from './ToolEditorModal';
@@ -108,9 +108,6 @@ const LANGUAGE_LABELS: Record<Template, string> = {
   'xhosa': 'Xhosa',
 };
 
-/**
- * Mapping of Gemini Voice IDs to Greek King/Queen Aliases.
- */
 const VOICE_ALIASES: Record<string, string> = {
   'Zephyr': 'King Aeolus',
   'Puck': 'King Pan',
@@ -150,7 +147,7 @@ const getVoiceAlias = (voiceId: string) => VOICE_ALIASES[voiceId] || `Persona ${
 
 export default function Sidebar() {
   const { isSidebarOpen, toggleSidebar } = useUI();
-  const { systemPrompt, voice, voiceFocus, setSystemPrompt, setVoice, setVoiceFocus } = useSettings();
+  const { systemPrompt, voice, voiceFocus, supabaseEnabled, setSystemPrompt, setVoice, setVoiceFocus, setSupabaseEnabled } = useSettings();
   const { tools, template, setTemplate, toggleTool, updateTool } = useTools();
   const { connected } = useLiveAPIContext();
 
@@ -208,7 +205,7 @@ export default function Sidebar() {
                 </select>
               </label>
 
-              <div className="tool-item" style={{ marginBottom: '24px' }}>
+              <div className="tool-item" style={{ marginBottom: '12px' }}>
                 <div className="tool-item-info">
                   <input
                     type="checkbox"
@@ -217,6 +214,18 @@ export default function Sidebar() {
                     onChange={(e) => setVoiceFocus(e.target.checked)}
                   />
                   <label htmlFor="voice-focus-toggle">Neural Sensitivity (Focus)</label>
+                </div>
+              </div>
+
+              <div className="tool-item" style={{ marginBottom: '24px' }}>
+                <div className="tool-item-info">
+                  <input
+                    type="checkbox"
+                    id="supabase-sync-toggle"
+                    checked={supabaseEnabled}
+                    onChange={(e) => setSupabaseEnabled(e.target.checked)}
+                  />
+                  <label htmlFor="supabase-sync-toggle">Cloud Sync (Supabase)</label>
                 </div>
               </div>
 
@@ -244,6 +253,9 @@ export default function Sidebar() {
                   className="sidebar-textarea"
                   placeholder="Enter custom instructions..."
                 />
+                <p style={{ fontSize: '0.7rem', opacity: 0.6, marginTop: '8px', lineHeight: 1.4 }}>
+                  Include emotional cues (e.g., "be cheerful") or cultural nuances to refine the AI's resonance engine.
+                </p>
               </label>
             </fieldset>
           </div>
@@ -273,7 +285,7 @@ export default function Sidebar() {
         </div>
         
         <div className="sidebar-footer" style={{ marginTop: 'auto', paddingTop: '20px' }}>
-          <div className="version-tag" style={{ fontSize: '0.65rem', opacity: 0.4 }}>v3.0.0-Polyglot</div>
+          <div className="version-tag" style={{ fontSize: '0.65rem', opacity: 0.4 }}>v3.1.0-Supabase-Sync</div>
           <div className={c('connection-indicator', { connected })} style={{ fontSize: '0.75rem', fontWeight: 700 }}>
             {connected ? '● ONLINE' : '○ STANDBY'}
           </div>

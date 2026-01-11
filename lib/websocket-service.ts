@@ -6,7 +6,7 @@
 import EventEmitter from 'eventemitter3';
 
 export interface WebSocketEvents {
-  message: (text: string) => void;
+  message: (data: { type: string; text: string; mode?: string; timestamp?: number }) => void;
   status: (status: 'connected' | 'disconnected' | 'connecting') => void;
 }
 
@@ -14,11 +14,19 @@ export class WebSocketService {
   private ws: WebSocket | null = null;
   private emitter = new EventEmitter<WebSocketEvents>();
   private _status: 'connected' | 'disconnected' | 'connecting' = 'disconnected';
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 0; // Disable auto-reconnect by default for local WS
+  private channel: BroadcastChannel;
 
   public on = this.emitter.on.bind(this.emitter);
   public off = this.emitter.off.bind(this.emitter);
 
-  constructor(private url: string = 'ws://localhost:8080/prompts') {}
+  constructor(private url: string = 'ws://localhost:8080/prompts') {
+    this.channel = new BroadcastChannel('super-translator-sync');
+    this.channel.onmessage = (event) => {
+      this.emitter.emit('message', event.data);
+    };
+  }
 
   public get status() { return this._status; }
 
@@ -28,46 +36,78 @@ export class WebSocketService {
   }
 
   public connect() {
-    // Only attempt on localhost
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && this.url.includes('localhost')) {
+    if (this.ws || this._status === 'connecting') return;
+
+    // Strictly only allow localhost for local WebSocket server
+    const isLocal = typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+    if (!isLocal) {
       return;
     }
-
-    if (this.ws || this._status === 'connecting') return;
 
     this.setStatus('connecting');
     try {
       this.ws = new WebSocket(this.url);
 
-      this.ws.onopen = () => this.setStatus('connected');
+      const connectionTimeout = setTimeout(() => {
+        if (this._status === 'connecting') {
+          try { this.ws?.close(); } catch(e) {}
+          this.setStatus('disconnected');
+          this.ws = null;
+        }
+      }, 1000);
+
+      this.ws.onopen = () => {
+        clearTimeout(connectionTimeout);
+        this.setStatus('connected');
+        this.reconnectAttempts = 0;
+      };
+
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          const text = data.text || data;
-          if (text && typeof text === 'string') this.emitter.emit('message', text.trim());
-        } catch (e) {}
+          this.emitter.emit('message', data);
+        } catch {
+          this.emitter.emit('message', { type: 'chat', text: event.data });
+        }
       };
 
       this.ws.onerror = () => {
-        // Silent: Do not propagate to UI error handlers
+        clearTimeout(connectionTimeout);
         this.setStatus('disconnected');
+        this.ws = null;
       };
 
       this.ws.onclose = () => {
-        this.ws = null;
+        clearTimeout(connectionTimeout);
         this.setStatus('disconnected');
+        this.ws = null;
       };
     } catch (err) {
       this.setStatus('disconnected');
+      this.ws = null;
     }
   }
 
-  public sendPrompt(text: string) {
+  public sendPrompt(data: any) {
+    const payload = typeof data === 'string' ? { type: 'chat', text: data, timestamp: Date.now() } : data;
+    
+    // Always use BroadcastChannel for local cross-tab sync
+    try {
+      this.channel.postMessage(payload);
+    } catch (e) {}
+
+    // Optionally send to real WebSocket if connected
     if (this.ws && this._status === 'connected') {
-      this.ws.send(JSON.stringify({ type: 'prompt', text }));
-      return true;
+      try {
+        this.ws.send(JSON.stringify(payload));
+        return true;
+      } catch (e) {
+        return false;
+      }
     }
-    return false;
+    return true; 
   }
 }
 
