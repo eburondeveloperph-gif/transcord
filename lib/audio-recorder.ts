@@ -58,6 +58,10 @@ export class AudioRecorder {
   private isSpeaking: boolean = false;
   private silenceFrames: number = 0;
   
+  // Rolling volume average to prevent transient spikes from false-triggering
+  private volumeHistory: number[] = [];
+  private readonly HISTORY_SIZE = 5;
+
   // Ducking Logic Variables
   private volumeMultiplier: number = 1.0; 
   private targetVolumeMultiplier: number = 1.0; 
@@ -69,59 +73,63 @@ export class AudioRecorder {
   }
 
   /**
-   * Refined VAD with Hysteresis and Hold-Time.
-   * Ensures accurate pause detection and prevents cutting off sentence endings.
+   * Refined VAD with Energy History, Adaptive Noise Floor, and Extended Hold-Time.
    */
   private updateSensitivity(volume: number) {
-    // 1. Adaptive Noise Floor Tracking
-    // We update the noise floor slowly during perceived silence.
-    if (!this.isSpeaking) {
-      this.noiseFloor = this.noiseFloor * 0.98 + Math.max(0.001, volume) * 0.02;
+    // 1. Energy Smoothing
+    this.volumeHistory.push(volume);
+    if (this.volumeHistory.length > this.HISTORY_SIZE) {
+      this.volumeHistory.shift();
     }
+    const smoothVolume = this.volumeHistory.reduce((a, b) => a + b, 0) / this.volumeHistory.length;
 
-    // 2. Hysteresis Thresholds
-    // Higher threshold to start speech, lower threshold to maintain it.
-    const START_THRESHOLD = this.noiseFloor * 3.0 + 0.015;
-    const STOP_THRESHOLD = this.noiseFloor * 1.5 + 0.005;
+    // 2. Adaptive Noise Floor Tracking
+    // We update noise floor even while speaking but much more slowly.
+    const noiseAlpha = this.isSpeaking ? 0.001 : 0.05;
+    this.noiseFloor = this.noiseFloor * (1 - noiseAlpha) + Math.max(0.001, smoothVolume) * noiseAlpha;
+
+    // 3. Dynamic Thresholds
+    // Use a tighter signal-to-noise ratio check.
+    const START_THRESHOLD = this.noiseFloor * 2.5 + 0.012; 
+    const STOP_THRESHOLD = this.noiseFloor * 1.3 + 0.004;
     
-    // 3. VAD State Machine
-    if (!this.isSpeaking && volume > START_THRESHOLD) {
-      // Speech Detected
+    // 4. VAD State Machine
+    if (!this.isSpeaking && smoothVolume > START_THRESHOLD) {
+      // Speech Detected - Aggressive start
       this.isSpeaking = true;
       this.silenceFrames = 0;
     } else if (this.isSpeaking) {
-      if (volume < STOP_THRESHOLD) {
+      if (smoothVolume < STOP_THRESHOLD) {
         this.silenceFrames++;
-        // HOLD TIME: 10 frames @ 25ms/frame = 250ms "hangover" 
-        // This ensures breathy sentence endings aren't clipped.
-        if (this.silenceFrames > 10) {
+        // HOLD TIME: Increase to 20 frames (~500ms hangover) for natural cadence.
+        if (this.silenceFrames > 20) {
           this.isSpeaking = false;
         }
       } else {
-        // Sustaining speech
         this.silenceFrames = 0;
       }
     }
 
-    // 4. Gain Calculation
-    const TARGET_LEVEL = 0.45; // Target RMS level for optimal Gemini performance
-    const MIN_GAIN = 0.4;
-    const MAX_GAIN = 5.0;
+    // 5. Gain Calculation
+    const TARGET_LEVEL = 0.5; // Slightly higher target for Gemini
+    const MIN_GAIN = 0.3;
+    const MAX_GAIN = 8.0; // Higher max gain for whispering
 
     if (this.isSpeaking) {
-      // Normalizing gain to bring quiet speech to a consistent level
-      const adjustmentFactor = TARGET_LEVEL / (Math.max(0.01, volume));
+      const adjustmentFactor = TARGET_LEVEL / (Math.max(0.005, smoothVolume));
       this.targetGain = Math.max(MIN_GAIN, Math.min(MAX_GAIN, adjustmentFactor));
     } else {
-      // Zero-suppression for Very Good VAD
+      // Strong suppression during silence
       this.targetGain = 0.0;
     }
 
-    // 5. Smooth Gain & Ducking Transitions
-    const gainAlpha = this.targetGain > this.currentGain ? 0.25 : 0.12; // Faster attack, slower release
+    // 6. Non-linear Gain Smoothing
+    // Fast attack (to catch the first syllable), slower release (to smooth out dips)
+    const gainAlpha = this.targetGain > this.currentGain ? 0.4 : 0.15;
     this.currentGain = this.currentGain * (1 - gainAlpha) + this.targetGain * gainAlpha;
     
-    const duckingAlpha = 0.15;
+    // Smooth Ducking
+    const duckingAlpha = 0.2;
     this.volumeMultiplier = this.volumeMultiplier * (1 - duckingAlpha) + this.targetVolumeMultiplier * duckingAlpha;
 
     const finalGain = this.currentGain * this.volumeMultiplier;
@@ -142,7 +150,7 @@ export class AudioRecorder {
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
-            autoGainControl: true,
+            autoGainControl: false, // We handle AGC manually for more transparency
             channelCount: 1,
             sampleRate: this.sampleRate
           } 
@@ -204,6 +212,7 @@ export class AudioRecorder {
       this.targetVolumeMultiplier = 1.0;
       this.isSpeaking = false;
       this.silenceFrames = 0;
+      this.volumeHistory = [];
     };
     if (this.starting) {
       this.starting.then(handleStop).catch(handleStop);
